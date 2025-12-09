@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Route;
 
 // Public routes
 Route::get('/', function () {
-    return redirect()->route('admin.dashboard');
+    return view('landing');
 })->name('landing');
 
 // User gallery route - public access via session code

@@ -1,7 +1,7 @@
 @extends('layouts.landing')
 
-@section('title', 'FotoQu | Bikin Momen Berkesan dengan Photobooth Berkualitas Tinggi')
-@section('meta_description', 'FotoQu menghadirkan photobooth berkualitas tinggi untuk semua event. Dari softcopy unlimited hingga custom frame A5. Hubungi WhatsApp untuk booking sekarang!')
+@section('title', 'FotoQu | Photobooth Termurah di Tangerang - Hasil Studio, Cetak Instan')
+@section('meta_description', 'Cari photobooth termurah di Tangerang? FotoQu solusinya! Kualitas studio, cetak instan, softcopy QR. Cocok untuk wedding, lamaran, & event kantor. Booking sekarang!')
 
 @section('content')
     @include('landing._navbar')
