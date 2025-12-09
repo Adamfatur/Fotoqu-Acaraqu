@@ -1,0 +1,941 @@
+{{-- Photo Selection JavaScript --}}
+<script>
+    // Store all loaded photos for reference
+    let allPhotos = [];
+    // Track temporary (local) photos captured but not yet mapped to server IDs
+    let tempPhotos = [];
+    let totalPhotosExpected = (settings && settings.total_photos) ? settings.total_photos : {{ config('fotoku.total_photos', 3) }};
+
+    // Utility: get best display URL for a photo (supports local temp objectUrl)
+    function getPhotoDisplayUrl(photo) {
+        if (!photo) return '/images/placeholder-photo.svg';
+        if (photo.objectUrl) return photo.objectUrl; // local preview
+        return photo.url 
+            || photo.public_url 
+            || photo.file_path 
+            || `/storage/photos/${photo.filename || ''}` 
+            || `/storage/sessions/${photo.session_id || ''}/${photo.filename || ''}` 
+            || '/images/placeholder-photo.svg';
+    }
+
+    // Render the photo grid from a list of photo-like objects
+    function renderPhotosGrid(photos) {
+        const grid = document.getElementById('photo-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        photos.forEach((photo) => {
+            const photoDiv = document.createElement('div');
+            photoDiv.className = 'photo-item bg-gray-200 relative cursor-pointer hover:scale-105 transition-transform duration-200 border-2 border-transparent';
+            const displayId = photo.id ?? photo.serverId ?? `seq-${photo.sequence_number}`;
+            photoDiv.setAttribute('data-photo-id', displayId);
+            photoDiv.setAttribute('data-seq', String(photo.sequence_number || ''));
+
+            const photoUrl = getPhotoDisplayUrl(photo);
+            const uploadingBadge = (photo.temp && !photo.serverId) ? `
+                <div class="absolute bottom-2 left-2 bg-yellow-400/90 text-black text-xs px-2 py-0.5 rounded-full shadow flex items-center gap-1">
+                    <i class="fas fa-cloud-upload-alt"></i> Mengunggah...
+                </div>` : '';
+
+            photoDiv.innerHTML = `
+                <img src="${photoUrl}" 
+                     alt="Photo ${photo.sequence_number}" 
+                     class="w-full h-full object-cover rounded-lg"
+                     onerror="handleImageError(this, '${displayId}', '${photo.sequence_number}')"
+                     onload="handleImageLoad(this)">
+                <div class="absolute top-2 left-2 bg-white/90 text-slate-900 text-sm px-2.5 py-1 rounded-full shadow">
+                    #${photo.sequence_number}
+                </div>
+                <div class="absolute top-2 right-2 selection-indicator hidden">
+                    <i class="fas fa-check-circle text-green-500 text-2xl"></i>
+                </div>
+                ${uploadingBadge}
+                <div class="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 transition-opacity duration-200">
+                    <div class="h-full flex flex-col justify-center items-center space-y-2">
+                        <button onclick="openPhotoPreview('${displayId}'); event.stopPropagation();" 
+                                class="bg-white/90 hover:bg-white text-black px-3 py-1 rounded-full text-sm font-medium transition-all">
+                            <i class="fas fa-search-plus mr-1"></i>
+                            Preview
+                        </button>
+                        <button onclick="togglePhotoSelection('${displayId}', this.closest('.photo-item')); event.stopPropagation();" 
+                                class="bg-green-600/90 hover:bg-green-700 text-white px-3 py-1 rounded-full text-sm font-medium transition-all">
+                            <i class="fas fa-check mr-1"></i>
+                            Pilih
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            photoDiv.addEventListener('click', (e) => {
+                if (!e.target.closest('button')) {
+                    togglePhotoSelection(displayId, photoDiv);
+                }
+            });
+            grid.appendChild(photoDiv);
+        });
+
+        // Ensure grid is visible
+        grid.style.display = 'grid';
+        grid.classList.remove('hidden');
+
+    // After rendering, attempt auto-selection if applicable
+    autoSelectIfNeeded();
+    }
+
+    async function loadPhotos() {
+        const grid = document.getElementById('photo-grid');
+        debugLog('Starting loadPhotos function', { photoboxCode });
+        
+        if (!grid) {
+            debugLog('ERROR: Photo grid element not found');
+            if (window.showPhotoAlert) {
+                showPhotoAlert({
+                    title: 'Gagal Memuat Grid Foto',
+                    message: 'Elemen grid foto tidak ditemukan. Silakan muat ulang halaman.',
+                    variant: 'error'
+                });
+            }
+            return;
+        }
+        
+        grid.innerHTML = '<div class="col-span-full text-center text-white py-8"><i class="fas fa-spinner fa-spin text-4xl mb-4"></i><br>Memuat foto...</div>';
+        
+        try {
+            // If we already have locally captured photos, show them instantly
+            if (Array.isArray(capturedPhotos) && capturedPhotos.length > 0) {
+                // Normalize structure for temp photos
+                tempPhotos = capturedPhotos.map(p => ({
+                    ...p,
+                    id: p.id, // may be temp-*
+                    serverId: p.serverId || null,
+                    sequence_number: p.sequence_number || p.sequence || 0,
+                    url: p.objectUrl || p.url || null,
+                    temp: Boolean(p.temp || !p.serverId)
+                }));
+                // Sort by sequence number
+                tempPhotos.sort((a, b) => (a.sequence_number || 0) - (b.sequence_number || 0));
+                allPhotos = tempPhotos;
+                renderPhotosGrid(allPhotos);
+                updateSelectionUI();
+                // Kick off a short reconcile poll so badges clear soon
+                shortReconcilePoll(5);
+            }
+
+            debugLog('Making API request to get photos');
+            
+            // Add timeout to the request
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+            
+            const response = await axios.get(`/photobox/${photoboxCode}/photos`, {
+                signal: controller.signal,
+                timeout: 30000
+            });
+            
+            clearTimeout(timeoutId);
+            debugLog('Photos API response received', response.data);
+            
+            if (response.data.success && response.data.photos && response.data.photos.length > 0) {
+                const photos = response.data.photos;
+                // Reconcile server photos with any temp previews by sequence number
+                allPhotos = reconcileServerPhotos(photos);
+                debugLog('Processing photos', { count: photos.length });
+                renderPhotosGrid(allPhotos);
+                // Update capturedPhotos reference as well
+                capturedPhotos = allPhotos;
+                debugLog('Photos loaded successfully', { totalPhotos: allPhotos.length });
+                updateSelectionUI();
+                // In case some uploads finished just before fetch, one more short reconcile
+                shortReconcilePoll(2);
+            } else {
+                debugLog('No photos found or invalid response', response.data);
+                if (!Array.isArray(capturedPhotos) || capturedPhotos.length === 0) {
+                    displayNoPhotosMessage(grid);
+                }
+            }
+        } catch (error) {
+            debugLog('ERROR loading photos', { 
+                message: error.message, 
+                code: error.code, 
+                response: error.response?.data 
+            });
+            if (!Array.isArray(capturedPhotos) || capturedPhotos.length === 0) {
+                displayErrorMessage(grid, error);
+            }
+        }
+    }
+
+    // Merge server photos with local temp previews using sequence_number
+    function reconcileServerPhotos(serverPhotos) {
+        const bySequence = new Map();
+        // Start with temp photos if any
+        (tempPhotos || []).forEach(tp => bySequence.set(tp.sequence_number, { ...tp }));
+        // Apply server photos
+        serverPhotos.forEach(sp => {
+            const seq = sp.sequence_number;
+            const existing = bySequence.get(seq);
+            if (existing) {
+                // Preserve temp objectUrl for seamless preview, but prefer server URL for future loads
+                bySequence.set(seq, {
+                    ...sp,
+                    sequence_number: seq,
+                    objectUrl: existing.objectUrl || null,
+                    temp: false,
+                    serverId: sp.id
+                });
+                // If this temp was selected earlier using temp id, remap selection
+                remapSelectionTempToServer(existing, sp);
+            } else {
+                bySequence.set(seq, { ...sp, temp: false, serverId: sp.id });
+            }
+        });
+        // Return in order
+        return Array.from(bySequence.values()).sort((a, b) => (a.sequence_number || 0) - (b.sequence_number || 0));
+    }
+
+    // Replace any selected temp photo with the corresponding server photo
+    function remapSelectionTempToServer(tempPhoto, serverPhoto) {
+        if (!tempPhoto || !serverPhoto) return;
+        selectedPhotos = selectedPhotos.map(sel => {
+            const isSame = (sel.temp && sel.sequence_number == tempPhoto.sequence_number) || (String(sel.id).startsWith('temp-') && sel.id === tempPhoto.id);
+            if (isSame) {
+                return { ...serverPhoto };
+            }
+            return sel;
+        });
+    }
+
+    // When a single upload completes, update mapping immediately
+    document.addEventListener('fotoku:photoUploaded', (e) => {
+        const { sequence_number, serverId, serverData } = e.detail || {};
+        if (!sequence_number || !serverId) return;
+        // Update tempPhotos
+        (tempPhotos || []).forEach(tp => {
+            if (tp.sequence_number == sequence_number) {
+                tp.serverId = serverId;
+                tp.temp = false;
+                tp.url = tp.objectUrl || tp.url; // keep local until full refresh
+                // Update allPhotos
+                const idx = allPhotos.findIndex(p => p.sequence_number == sequence_number);
+                if (idx >= 0) {
+                    allPhotos[idx] = { ...serverData, objectUrl: tp.objectUrl || null, serverId };
+                }
+                // Update DOM attributes for this tile
+                const grid = document.getElementById('photo-grid');
+                    if (grid) {
+                        const tile = grid.querySelector(`.photo-item[data-seq="${String(sequence_number)}"]`) || document.querySelector(`.photo-item[data-photo-id="${tp.id}"]`);
+                    if (tile) {
+                        tile.setAttribute('data-photo-id', serverId);
+                        const badge = tile.querySelector('.bg-yellow-400/90');
+                        if (badge) badge.remove();
+                    }
+                }
+            }
+        });
+        updateSelectionUI();
+    });
+
+        // Optional: short-lived polling to reconcile if server list lags behind events
+        async function shortReconcilePoll(maxTries = 5) {
+            for (let i = 0; i < maxTries; i++) {
+                try {
+                    const res = await axios.get(`/photobox/${photoboxCode}/photos`, { timeout: 8000 });
+                    if (res.data?.success && Array.isArray(res.data.photos) && res.data.photos.length > 0) {
+                        allPhotos = reconcileServerPhotos(res.data.photos);
+                        renderPhotosGrid(allPhotos);
+                        capturedPhotos = allPhotos;
+                        updateSelectionUI();
+                        return;
+                    }
+                } catch (_) {}
+                await new Promise(r => setTimeout(r, 1200));
+            }
+        }
+
+    function togglePhotoSelection(photoId, element) {
+        debugLog('Photo selection toggled', { photoId, selectedPhotos });
+        
+        // Get max selection from config (3 photos for 6-slot frame)
+        const maxSelection = {{ config('fotoku.frame_templates.fotostrip.user_selection', 3) }};
+        
+        debugLog('Max selection determined', { 
+            maxSelection, 
+            configValue: {{ config('fotoku.frame_templates.fotostrip.user_selection', 3) }},
+            currentSession: currentSession
+        });
+        
+    // Find photo object from allPhotos (support temp id and serverId)
+    let photo = null;
+    if (typeof photoId === 'string' && photoId.startsWith('seq-')) {
+        const seq = photoId.split('seq-')[1];
+        photo = allPhotos.find(p => String(p.sequence_number) === String(seq));
+    } else {
+        photo = allPhotos.find(p => String(p.id) === String(photoId) || String(p.serverId) === String(photoId));
+    }
+        if (!photo) {
+            console.error('Photo not found in allPhotos:', photoId);
+            return;
+        }
+        
+        // Check if photo is already selected (by ID)
+    const isSelected = selectedPhotos.some(p => 
+        String(p.id) === String(photoId) || 
+        String(p.serverId) === String(photoId) ||
+        (typeof photoId === 'string' && photoId.startsWith('seq-') && String(p.sequence_number) === String(photo.sequence_number))
+    );
+        
+        if (isSelected) {
+            // Deselect
+            selectedPhotos = selectedPhotos.filter(p => {
+                const matchesId = String(p.id) === String(photoId);
+                const matchesServerId = String(p.serverId) === String(photoId);
+                const matchesSeq = typeof photoId === 'string' && photoId.startsWith('seq-') && String(p.sequence_number) === String(photo.sequence_number);
+                return !(matchesId || matchesServerId || matchesSeq);
+            });
+            element.classList.remove('selected');
+            element.style.borderColor = 'transparent';
+            
+            const indicator = element.querySelector('.selection-indicator');
+            if (indicator) indicator.classList.add('hidden');
+            
+            debugLog('Photo deselected', { photoId, remainingSelected: selectedPhotos });
+        } else if (selectedPhotos.length < maxSelection) {
+            // Select - store full photo object
+            selectedPhotos.push(photo);
+            element.classList.add('selected');
+            element.style.borderColor = '#10b981';
+            element.style.borderWidth = '3px';
+            
+            const indicator = element.querySelector('.selection-indicator');
+            if (indicator) indicator.classList.remove('hidden');
+            
+            debugLog('Photo selected', { photoId, totalSelected: selectedPhotos });
+            
+            // Haptic feedback (if available)
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        } else {
+            // Show message if trying to select more than allowed
+            debugLog('Selection limit reached', { maxSelection, currentSelection: selectedPhotos.length });
+            if (window.showPhotoAlert) {
+                showPhotoAlert({
+                    title: 'Batas Pilihan Tercapai',
+                    message: `Maksimal ${maxSelection} foto yang dapat dipilih`,
+                    variant: 'warning',
+                    autoCloseMs: 1800
+                });
+            }
+            return; // Don't update UI if selection failed
+        }
+        
+        updateSelectionUI();
+    }
+
+    function updateSelectionUI() {
+        const selectedCountEl = document.getElementById('selected-count');
+        const maxSelectionEl = document.getElementById('max-selection');
+        const confirmBtn = document.getElementById('confirm-selection-btn');
+        const requiredPhotosEl = document.getElementById('required-photos');
+        
+        if (selectedCountEl) selectedCountEl.textContent = selectedPhotos.length;
+        
+        // Use config value for required photos (3 photos for 6-slot frame)
+        const requiredCount = {{ config('fotoku.frame_templates.fotostrip.user_selection', 3) }};
+        
+        if (maxSelectionEl) maxSelectionEl.textContent = requiredCount;
+        if (requiredPhotosEl) requiredPhotosEl.textContent = requiredCount;
+        
+        debugLog('updateSelectionUI called', {
+            selectedCount: selectedPhotos.length,
+            requiredCount: requiredCount,
+            configValue: {{ config('fotoku.frame_templates.fotostrip.user_selection', 3) }}
+        });
+        
+        if (confirmBtn) {
+            const allMapped = selectedPhotos.every(p => typeof p.id === 'number' || typeof p.serverId === 'number');
+            const shouldEnable = selectedPhotos.length === requiredCount && selectedPhotos.length > 0 && allMapped;
+            
+            debugLog('Button enable check', {
+                selectedLength: selectedPhotos.length,
+                requiredCount: requiredCount,
+                shouldEnable: shouldEnable,
+                buttonCurrentlyDisabled: confirmBtn.disabled
+            });
+            
+            if (shouldEnable) {
+                confirmBtn.disabled = false;
+                confirmBtn.classList.remove('disabled:opacity-50', 'disabled:cursor-not-allowed');
+                confirmBtn.classList.add('hover:from-green-700', 'hover:to-emerald-600');
+                debugLog('✅ Confirm button ENABLED');
+            } else {
+                confirmBtn.disabled = true;
+                confirmBtn.classList.add('disabled:opacity-50', 'disabled:cursor-not-allowed');
+                confirmBtn.classList.remove('hover:from-green-700', 'hover:to-emerald-600');
+                debugLog('❌ Confirm button DISABLED');
+            }
+        } else {
+            debugLog('❌ Confirm button element not found');
+        }
+
+        // If required count equals total photos expected, auto-select all
+        autoSelectIfNeeded();
+    }
+
+    // Guard to avoid re-entrancy during auto-selection
+    let _autoSelectLock = false;
+
+    // Auto-select all photos when the number of photos taken equals the required selection count
+    function autoSelectIfNeeded() {
+        try {
+            if (_autoSelectLock) return;
+            const requiredCount = {{ config('fotoku.frame_templates.fotostrip.user_selection', 3) }};
+            // totalPhotosExpected represents how many were captured in the session
+            if (!allPhotos || !Array.isArray(allPhotos)) return;
+            if (totalPhotosExpected && requiredCount && Number(totalPhotosExpected) === Number(requiredCount)) {
+                // If already selected correctly, do nothing
+                if (selectedPhotos.length === requiredCount) return;
+
+                _autoSelectLock = true;
+
+                // Clear existing selection visually and logically by using existing toggle function
+                // We first deselect all to ensure a clean state
+                selectedPhotos = [];
+                document.querySelectorAll('.photo-item').forEach(item => {
+                    item.classList.remove('selected');
+                    item.style.borderColor = 'transparent';
+                    item.style.borderWidth = '2px';
+                    const indicator = item.querySelector('.selection-indicator');
+                    if (indicator) indicator.classList.add('hidden');
+                });
+
+                // Select photos by invoking togglePhotoSelection so UI, events and side-effects match manual selection
+                const picks = allPhotos.slice(0, requiredCount);
+                picks.forEach(p => {
+                    // derive display id used by tiles
+                    const displayId = p.serverId || p.id || `seq-${p.sequence_number}`;
+                    // find DOM element for this photo
+                    const el = document.querySelector(`.photo-item[data-photo-id="${displayId}"]`) || document.querySelector(`.photo-item[data-seq="${String(p.sequence_number)}"]`);
+                    if (el) {
+                        // If not already selected, toggle selection (this will add to selectedPhotos)
+                        const already = selectedPhotos.some(sp => String(sp.sequence_number) === String(p.sequence_number) || String(sp.serverId) === String(p.serverId) || String(sp.id) === String(p.id));
+                        if (!already) {
+                            try { togglePhotoSelection(String(displayId), el); } catch (e) { /* fallback to manual DOM update below */ }
+                        }
+                    }
+                });
+
+                // Fallback: if for some reason toggle didn't work, ensure selectedPhotos is populated
+                if (selectedPhotos.length !== requiredCount) {
+                    selectedPhotos = picks.slice(0, requiredCount);
+                    document.querySelectorAll('.photo-item').forEach(item => {
+                        const seq = item.getAttribute('data-seq');
+                        const photoMatch = selectedPhotos.some(sp => String(sp.sequence_number) === String(seq) || String(sp.id) === item.getAttribute('data-photo-id'));
+                        if (photoMatch) {
+                            item.classList.add('selected');
+                            item.style.borderColor = '#10b981';
+                            item.style.borderWidth = '3px';
+                            const indicator = item.querySelector('.selection-indicator');
+                            if (indicator) indicator.classList.remove('hidden');
+                        }
+                    });
+                }
+
+                // Update UI (this will enable confirm button if mapped)
+                updateSelectionUI();
+                _autoSelectLock = false;
+            }
+        } catch (err) {
+            _autoSelectLock = false;
+            debugLog('autoSelectIfNeeded error', { err: err.message });
+        }
+    }
+
+    function resetSelection() {
+        selectedPhotos = [];
+        document.querySelectorAll('.photo-item').forEach(item => {
+            item.classList.remove('selected');
+            item.style.borderColor = 'transparent';
+            item.style.borderWidth = '2px';
+            
+            const indicator = item.querySelector('.selection-indicator');
+            if (indicator) indicator.classList.add('hidden');
+        });
+        updateSelectionUI();
+    }
+
+    async function confirmSelection() {
+        if (selectedPhotos.length === 0) return;
+
+        try {
+            showProcessingState();
+            
+            // Extract IDs from photo objects for backend
+            const photoIds = selectedPhotos.map(photo => (typeof photo.id === 'number') ? photo.id : photo.serverId).filter(Boolean);
+            if (photoIds.length !== selectedPhotos.length) {
+                // Some photos not mapped yet; wait briefly and retry mapping once
+                await new Promise(r => setTimeout(r, 800));
+                const retryIds = selectedPhotos.map(photo => (typeof photo.id === 'number') ? photo.id : photo.serverId).filter(Boolean);
+                if (retryIds.length !== selectedPhotos.length) {
+                    if (window.showPhotoAlert) {
+                        showPhotoAlert({
+                            title: 'Tunggu Sebentar',
+                            message: 'Sebagian foto masih diunggah. Tunggu beberapa detik lalu coba lagi.',
+                            variant: 'info'
+                        }).then(() => { showSelectionState(); });
+                    } else {
+                        showSelectionState();
+                    }
+                    return;
+                }
+            }
+            
+            const response = await axios.post(`/photobox/${photoboxCode}/select`, {
+                selected_photos: photoIds
+            });
+
+            if (response.data.success) {
+                setTimeout(() => {
+                    showCompletedState();
+                }, 3000);
+            }
+        } catch (error) {
+            if (window.showPhotoAlert) {
+                showPhotoAlert({
+                    title: 'Gagal Memproses Foto',
+                    message: (error.response?.data?.error || error.message || 'Terjadi kesalahan tak diketahui'),
+                    variant: 'error'
+                }).then(() => { showSelectionState(); });
+            } else {
+                showSelectionState();
+            }
+        }
+    }
+
+    // Navigate to frame design state
+    function proceedToFrameDesign() {
+        if (selectedPhotos.length === 0) {
+            if (window.showPhotoAlert) {
+                showPhotoAlert({
+                    title: 'Belum Ada Pilihan',
+                    message: 'Silakan pilih foto terlebih dahulu.',
+                    variant: 'info',
+                    autoCloseMs: 1600
+                });
+            }
+            return;
+        }
+
+        const requiredCount = {{ config('fotoku.frame_templates.fotostrip.user_selection', 3) }};
+        if (selectedPhotos.length !== requiredCount) {
+            if (window.showPhotoAlert) {
+                showPhotoAlert({
+                    title: 'Jumlah Pilihan Belum Tepat',
+                    message: `Silakan pilih ${requiredCount} foto sesuai kebutuhan frame.`,
+                    variant: 'warning'
+                });
+            }
+            return;
+        }
+        console.log('Proceeding to frame design with selected photos:', selectedPhotos);
+        
+        // Debug: Ensure data is correctly transferred
+        console.log('=== DATA TRANSFER DEBUG ===');
+        console.log('selectedPhotos type:', typeof selectedPhotos);
+        console.log('selectedPhotos length:', selectedPhotos.length);
+        console.log('selectedPhotos content:', selectedPhotos);
+        selectedPhotos.forEach((photo, index) => {
+            console.log(`Photo ${index + 1}:`, photo);
+        });
+        
+        hideAllStates();
+        showState('frame-design-state');
+        
+        // Use safe initialization with better error handling
+        if (typeof window.safeInitializeFrameDesign === 'function') {
+            window.safeInitializeFrameDesign();
+        } else if (typeof initializeFrameDesign === 'function') {
+            initializeFrameDesign();
+        } else {
+            console.warn('🔄 Frame design functions not available yet, retrying...');
+            let retryCount = 0;
+            const maxRetries = 10;
+            
+            const retryInitialization = () => {
+                retryCount++;
+                if (typeof window.safeInitializeFrameDesign === 'function') {
+                    console.log('✅ Found safeInitializeFrameDesign, calling it');
+                    window.safeInitializeFrameDesign();
+                } else if (typeof initializeFrameDesign === 'function') {
+                    console.log('✅ Found initializeFrameDesign, calling it');
+                    initializeFrameDesign();
+                } else if (retryCount < maxRetries) {
+                    console.log(`⏳ Retry ${retryCount}/${maxRetries} in 100ms...`);
+                    setTimeout(retryInitialization, 100);
+                } else {
+                    console.error('❌ Failed to initialize frame design after maximum retries');
+                }
+            };
+            
+            setTimeout(retryInitialization, 100);
+        }
+    }
+
+    // Debug function for photo selection testing
+    function debugPhotoSelection() {
+        console.log('=== PHOTO SELECTION DEBUG ===');
+        console.log('All loaded photos:', allPhotos);
+        console.log('Selected photos:', selectedPhotos);
+        console.log('Current session:', currentSession);
+        
+        if (selectedPhotos.length > 0) {
+            console.log('First selected photo structure:', selectedPhotos[0]);
+        }
+        
+        return {
+            allPhotos,
+            selectedPhotos,
+            currentSession
+        };
+    }
+
+    // Expose for console testing
+    window.debugPhotoSelection = debugPhotoSelection;
+
+    // Helper functions for photo loading
+    function displayNoPhotosMessage(grid) {
+        grid.innerHTML = `
+            <div class="col-span-full text-center py-12">
+                <div class="bg-yellow-500/20 text-yellow-200 rounded-xl p-6 border border-yellow-400/30 max-w-md mx-auto">
+                    <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                    <h3 class="text-xl font-semibold mb-2">Tidak Ada Foto</h3>
+                    <p class="mb-4">Tidak ada foto yang tersedia untuk dipilih</p>
+                    <button onclick="showCaptureState()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
+                        <i class="fas fa-camera mr-2"></i>Ambil Foto Lagi
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function displayErrorMessage(grid, error) {
+        const errorMessage = error.code === 'ECONNABORTED' ? 'Request timeout' : 
+                             (error.response?.data?.error || error.message || 'Unknown error');
+        
+        grid.innerHTML = `
+            <div class="col-span-full text-center py-12">
+                <div class="bg-red-500/20 text-red-200 rounded-xl p-6 border border-red-400/30 max-w-md mx-auto">
+                    <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
+                    <h3 class="text-xl font-semibold mb-2">Error Memuat Foto</h3>
+                    <p class="mb-4 text-sm">Terjadi kesalahan: ${errorMessage}</p>
+                    <div class="space-x-2">
+                        <button onclick="loadPhotos()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                            <i class="fas fa-sync-alt mr-2"></i>Coba Lagi
+                        </button>
+                        <button onclick="showCaptureState()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
+                            <i class="fas fa-camera mr-2"></i>Ambil Foto Baru
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Helper function for image error handling
+    function handleImageError(img, photoId, sequenceNumber) {
+        console.warn('Image load error for photo:', photoId, 'sequence:', sequenceNumber);
+        
+        // Try different fallback URLs
+        const fallbackUrls = [
+            '/images/placeholder-photo.svg',
+            '/images/placeholder-photo.jpg',
+            '/images/no-image.png',
+            'data:image/svg+xml;base64,' + btoa(`
+                <svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+                    <rect width="400" height="300" fill="#f3f4f6"/>
+                    <text x="50%" y="50%" text-anchor="middle" fill="#6b7280" font-family="Arial" font-size="16">
+                        Photo #${sequenceNumber}
+                    </text>
+                    <text x="50%" y="65%" text-anchor="middle" fill="#9ca3af" font-family="Arial" font-size="12">
+                        Image not available
+                    </text>
+                </svg>
+            `)
+        ];
+        
+        const currentSrc = img.src;
+        let nextFallback = null;
+        
+        for (let i = 0; i < fallbackUrls.length; i++) {
+            if (!currentSrc.includes(fallbackUrls[i])) {
+                nextFallback = fallbackUrls[i];
+                break;
+            }
+        }
+        
+        if (nextFallback) {
+            img.src = nextFallback;
+        } else {
+            // Last resort: create a placeholder div
+            const parentDiv = img.parentElement;
+            parentDiv.innerHTML = `
+                <div class="w-full h-full bg-gray-300 flex items-center justify-center text-gray-600">
+                    <div class="text-center">
+                        <i class="fas fa-image text-3xl mb-2"></i>
+                        <div class="text-sm">Photo #${sequenceNumber}</div>
+                        <div class="text-xs">Not available</div>
+                    </div>
+                </div>
+                <div class="absolute top-2 left-2 bg-black/70 text-white text-sm px-2 py-1 rounded">
+                    #${sequenceNumber}
+                </div>
+                <div class="absolute top-2 right-2 selection-indicator hidden">
+                    <i class="fas fa-check-circle text-green-500 text-2xl"></i>
+                </div>
+            `;
+        }
+    }
+
+    function handleImageLoad(img) {
+        console.log('Image loaded successfully:', img.src);
+        img.style.opacity = '1';
+        img.onerror = null; // Prevent infinite loop
+    }
+
+    // Debug function to check button status - now active in production
+    function debugButtonStatus() {
+        const confirmBtn = document.getElementById('confirm-selection-btn');
+        const selectedCountEl = document.getElementById('selected-count');
+        const maxSelectionEl = document.getElementById('max-selection');
+        
+        console.log('=== BUTTON DEBUG STATUS ===');
+        console.log('Button element found:', !!confirmBtn);
+        console.log('Button disabled:', confirmBtn?.disabled);
+        console.log('Button classes:', confirmBtn?.className);
+        console.log('Selected photos:', selectedPhotos);
+        console.log('Selected count:', selectedPhotos.length);
+        console.log('Current session:', currentSession);
+        console.log('Frame slots (raw):', currentSession?.frame_slots);
+        console.log('Frame slots (parsed):', parseInt(currentSession?.frame_slots));
+        console.log('Selected count element text:', selectedCountEl?.textContent);
+        console.log('Max selection element text:', maxSelectionEl?.textContent);
+        console.log('Should enable button:', selectedPhotos.length === parseInt(currentSession?.frame_slots || 4) && selectedPhotos.length > 0);
+        console.log('========================');
+    }
+
+    // === PHOTO PREVIEW FUNCTIONS ===
+    let currentPreviewIndex = 0;
+    let currentPreviewPhotos = [];
+
+    function openPhotoPreview(photoId) {
+        console.log('🔍 Opening photo preview for ID:', photoId);
+        
+        const modal = document.getElementById('photo-preview-modal');
+        const previewImage = document.getElementById('preview-photo-image');
+        const previewNumber = document.getElementById('preview-photo-number');
+        
+        if (!modal || !previewImage || !previewNumber) {
+            console.error('❌ Preview modal elements not found');
+            return;
+        }
+        
+        // Normalize lookups: support id, serverId, and seq-* token
+        let targetPhoto = null;
+        if (typeof photoId === 'string' && photoId.startsWith('seq-')) {
+            const seq = photoId.split('seq-')[1];
+            targetPhoto = allPhotos.find(p => String(p.sequence_number) === String(seq));
+        } else {
+            targetPhoto = allPhotos.find(p => String(p.id) === String(photoId) || String(p.serverId) === String(photoId));
+        }
+        
+        if (!targetPhoto) {
+            console.error('❌ Photo not found in allPhotos array:', photoId);
+            return;
+        }
+        
+        // Set current preview data
+        currentPreviewPhotos = allPhotos;
+        // Prefer index by id/serverId first
+        let idx = -1;
+        if (typeof photoId === 'string' && photoId.startsWith('seq-')) {
+            idx = allPhotos.findIndex(p => String(p.sequence_number) === String(targetPhoto.sequence_number));
+        } else {
+            idx = allPhotos.findIndex(p => String(p.id) === String(photoId) || String(p.serverId) === String(photoId));
+        }
+        // Fallback to sequence_number match
+        if (idx === -1 && targetPhoto.sequence_number != null) {
+            idx = allPhotos.findIndex(p => String(p.sequence_number) === String(targetPhoto.sequence_number));
+        }
+        // Final fallback: direct reference or first photo
+        if (idx === -1) {
+            const refIdx = allPhotos.indexOf(targetPhoto);
+            idx = refIdx !== -1 ? refIdx : 0;
+        }
+        currentPreviewIndex = idx;
+        
+        // Update preview content
+        updatePreviewContent();
+        
+        // Show modal
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden'; // Prevent background scroll
+        
+        console.log('✅ Photo preview opened:', { photoId, index: currentPreviewIndex });
+    }
+
+    function closePhotoPreview() {
+        console.log('❌ Closing photo preview');
+        
+        const modal = document.getElementById('photo-preview-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            document.body.style.overflow = ''; // Restore scroll
+        }
+    }
+
+    function updatePreviewContent() {
+        if (currentPreviewIndex < 0 || currentPreviewIndex >= currentPreviewPhotos.length) {
+            console.error('❌ Invalid preview index:', currentPreviewIndex);
+            return;
+        }
+        
+        const photo = currentPreviewPhotos[currentPreviewIndex];
+        const previewImage = document.getElementById('preview-photo-image');
+        const previewNumber = document.getElementById('preview-photo-number');
+        const selectBtn = document.getElementById('preview-select-btn');
+        const selectText = document.getElementById('preview-select-text');
+        const prevBtn = document.getElementById('preview-prev-btn');
+        const nextBtn = document.getElementById('preview-next-btn');
+        
+        if (!photo) {
+            console.error('❌ Photo not found at index:', currentPreviewIndex);
+            return;
+        }
+        
+        // Get photo URL with fallbacks
+    const photoUrl = getPhotoDisplayUrl(photo);
+        
+        // Update preview image
+        if (previewImage) {
+            previewImage.src = photoUrl;
+            previewImage.alt = `Photo ${photo.sequence_number}`;
+        }
+        
+        // Update photo number
+        if (previewNumber) {
+            previewNumber.textContent = photo.sequence_number;
+        }
+        
+        // Update selection button state (support id/serverId/sequence fallback)
+        const isSelected = selectedPhotos.some(p => 
+            String(p.id) === String(photo.id) || 
+            String(p.serverId) === String(photo.serverId) || 
+            String(p.sequence_number) === String(photo.sequence_number)
+        );
+        if (selectBtn && selectText) {
+            if (isSelected) {
+                selectBtn.className = 'touch-btn bg-red-600/80 hover:bg-red-700/80 text-white rounded-xl border border-red-400';
+                selectText.innerHTML = '<i class="fas fa-times mr-2"></i>Batalkan Pilihan';
+            } else {
+                selectBtn.className = 'touch-btn bg-green-600/80 hover:bg-green-700/80 text-white rounded-xl border border-green-400';
+                selectText.innerHTML = '<i class="fas fa-check mr-2"></i>Pilih Foto';
+            }
+        }
+        
+        // Update navigation buttons
+        if (prevBtn) {
+            prevBtn.disabled = currentPreviewIndex === 0;
+            prevBtn.classList.toggle('opacity-50', currentPreviewIndex === 0);
+        }
+        
+        if (nextBtn) {
+            nextBtn.disabled = currentPreviewIndex === currentPreviewPhotos.length - 1;
+            nextBtn.classList.toggle('opacity-50', currentPreviewIndex === currentPreviewPhotos.length - 1);
+        }
+        
+        console.log('✅ Preview content updated:', { 
+            photoId: photo.id, 
+            sequence: photo.sequence_number, 
+            isSelected: isSelected,
+            index: currentPreviewIndex,
+            total: currentPreviewPhotos.length
+        });
+    }
+
+    function previewPreviousPhoto() {
+        if (currentPreviewIndex > 0) {
+            currentPreviewIndex--;
+            updatePreviewContent();
+            console.log('⬅️ Preview previous photo:', currentPreviewIndex);
+        }
+    }
+
+    function previewNextPhoto() {
+        if (currentPreviewIndex < currentPreviewPhotos.length - 1) {
+            currentPreviewIndex++;
+            updatePreviewContent();
+            console.log('➡️ Preview next photo:', currentPreviewIndex);
+        }
+    }
+
+    function togglePreviewPhotoSelection() {
+        if (currentPreviewIndex < 0 || currentPreviewIndex >= currentPreviewPhotos.length) {
+            console.error('❌ Invalid preview index for selection:', currentPreviewIndex);
+            return;
+        }
+        
+        const photo = currentPreviewPhotos[currentPreviewIndex];
+        // Determine the best DOM identifier for the tile
+        const queryId = (photo.id != null ? photo.id : (photo.serverId != null ? photo.serverId : `seq-${photo.sequence_number}`));
+        let photoElement = document.querySelector(`[data-photo-id="${queryId}"]`);
+        if (!photoElement && photo.sequence_number != null) {
+            photoElement = document.querySelector(`.photo-item[data-seq="${String(photo.sequence_number)}"]`);
+        }
+        
+        if (photoElement) {
+            togglePhotoSelection(queryId, photoElement);
+            updatePreviewContent(); // Update button state
+            console.log('🔄 Photo selection toggled from preview:', photo.id);
+        } else {
+            console.error('❌ Photo element not found for selection:', photo.id);
+        }
+    }
+
+    // Add global functions for preview
+    window.openPhotoPreview = openPhotoPreview;
+    window.closePhotoPreview = closePhotoPreview;
+    window.previewPreviousPhoto = previewPreviousPhoto;
+    window.previewNextPhoto = previewNextPhoto;
+    window.togglePreviewPhotoSelection = togglePreviewPhotoSelection;
+
+    // Add keyboard navigation for preview modal
+    document.addEventListener('keydown', function(e) {
+        const modal = document.getElementById('photo-preview-modal');
+        if (!modal || modal.classList.contains('hidden')) {
+            return; // Modal is not open
+        }
+        
+        switch(e.key) {
+            case 'Escape':
+                closePhotoPreview();
+                e.preventDefault();
+                break;
+            case 'ArrowLeft':
+                previewPreviousPhoto();
+                e.preventDefault();
+                break;
+            case 'ArrowRight':
+                previewNextPhoto();
+                e.preventDefault();
+                break;
+            case ' ': // Spacebar
+            case 'Enter':
+                togglePreviewPhotoSelection();
+                e.preventDefault();
+                break;
+        }
+    });
+
+    // Export helpers for other modules
+    window.renderPhotosGrid = renderPhotosGrid;
+
+</script>

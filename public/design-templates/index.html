@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fotoku Design Template Guide</title>
+    <style>
+        body {
+            font-family: 'Inter', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1a202c;
+            background: linear-gradient(135deg, #f4f7fa 0%, #e2e8f0 100%);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #166534 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        .header p {
+            margin: 10px 0 0;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        .content {
+            padding: 40px;
+        }
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin: 30px 0;
+        }
+        .template-card {
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 25px;
+            transition: all 0.3s ease;
+            background: #f8fafc;
+        }
+        .template-card:hover {
+            border-color: #1e3a8a;
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(30, 58, 138, 0.1);
+        }
+        .template-card h3 {
+            color: #1e3a8a;
+            margin: 0 0 15px;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        .specs {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #166534;
+        }
+        .specs table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .specs td {
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .specs td:first-child {
+            font-weight: 600;
+            color: #374151;
+            width: 40%;
+        }
+        .specs td:last-child {
+            color: #1e3a8a;
+            font-family: 'Monaco', monospace;
+        }
+        .download-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #166534 0%, #059669 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 15px;
+        }
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(22, 101, 52, 0.3);
+        }
+        .visual-demo {
+            background: #f1f5f9;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .canvas-demo {
+            background: white;
+            border: 2px dashed #94a3b8;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px auto;
+            position: relative;
+            overflow: hidden;
+        }
+        .photo-slot {
+            background: #e2e8f0;
+            border: 2px dashed #1e3a8a;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1e3a8a;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin: 5px;
+        }
+        .brand-area {
+            background: #dbeafe;
+            border: 2px solid #1e3a8a;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1e3a8a;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin: 5px 0 0;
+        }
+        .layout-4 {
+            width: 300px;
+            height: 424px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr auto;
+            gap: 8px;
+        }
+        .layout-6 {
+            width: 300px;
+            height: 424px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr auto;
+            gap: 6px;
+        }
+        .layout-8 {
+            width: 300px;
+            height: 424px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr 1fr auto;
+            gap: 5px;
+        }
+        .brand-area-4 { height: 40px; grid-column: 1 / -1; }
+        .brand-area-6 { height: 35px; grid-column: 1 / -1; }
+        .brand-area-8 { height: 30px; grid-column: 1 / -1; }
+        
+        .color-palette {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .color-item {
+            text-align: center;
+            min-width: 100px;
+        }
+        .color-swatch {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            margin: 0 auto 8px;
+            border: 2px solid #e2e8f0;
+        }
+        .tips {
+            background: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        .tips h4 {
+            color: #0c4a6e;
+            margin: 0 0 15px;
+            font-size: 1.1rem;
+        }
+        .tips ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .tips li {
+            color: #0c4a6e;
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📐 Fotoku Design Template</h1>
+            <p>Panduan Desain Frame Photobox dengan Ukuran Akurat</p>
+        </div>
+        
+        <div class="content">
+            <div class="template-grid">
+                <!-- Template 4 Slot -->
+                <div class="template-card">
+                    <h3>🎯 Frame 4 Slot (2×2)</h3>
+                    <div class="visual-demo">
+                        <div class="canvas-demo layout-4">
+                            <div class="photo-slot">FOTO 1<br>784×1150</div>
+                            <div class="photo-slot">FOTO 2<br>784×1150</div>
+                            <div class="photo-slot">FOTO 3<br>784×1150</div>
+                            <div class="photo-slot">FOTO 4<br>784×1150</div>
+                            <div class="brand-area brand-area-4">BRANDING AREA</div>
+                        </div>
+                    </div>
+                    <div class="specs">
+                        <table>
+                            <tr><td>Canvas Size</td><td>1748 × 2480 px</td></tr>
+                            <tr><td>Photo Size</td><td>784 × 1150 px</td></tr>
+                            <tr><td>Margin</td><td>60 px</td></tr>
+                            <tr><td>Spacing</td><td>60 px</td></tr>
+                            <tr><td>Brand Area</td><td>200 px height</td></tr>
+                        </table>
+                    </div>
+                    <a href="/admin/frame-templates/download/design-template?slots=4" class="download-btn">
+                        📥 Download Template 4 Slot
+                    </a>
+                </div>
+
+                <!-- Template 6 Slot -->
+                <div class="template-card">
+                    <h3>🎯 Frame 6 Slot (2×3)</h3>
+                    <div class="visual-demo">
+                        <div class="canvas-demo layout-6">
+                            <div class="photo-slot">FOTO 1<br>799×753</div>
+                            <div class="photo-slot">FOTO 2<br>799×753</div>
+                            <div class="photo-slot">FOTO 3<br>799×753</div>
+                            <div class="photo-slot">FOTO 4<br>799×753</div>
+                            <div class="photo-slot">FOTO 5<br>799×753</div>
+                            <div class="photo-slot">FOTO 6<br>799×753</div>
+                            <div class="brand-area brand-area-6">BRANDING AREA</div>
+                        </div>
+                    </div>
+                    <div class="specs">
+                        <table>
+                            <tr><td>Canvas Size</td><td>1748 × 2480 px</td></tr>
+                            <tr><td>Photo Size</td><td>799 × 753 px</td></tr>
+                            <tr><td>Margin</td><td>50 px</td></tr>
+                            <tr><td>Spacing</td><td>50 px</td></tr>
+                            <tr><td>Brand Area</td><td>180 px height</td></tr>
+                        </table>
+                    </div>
+                    <a href="/admin/frame-templates/download/design-template?slots=6" class="download-btn">
+                        📥 Download Template 6 Slot
+                    </a>
+                </div>
+
+                <!-- Template 8 Slot -->
+                <div class="template-card">
+                    <h3>🎯 Frame 8 Slot (2×4)</h3>
+                    <div class="visual-demo">
+                        <div class="canvas-demo layout-8">
+                            <div class="photo-slot">FOTO 1<br>814×570</div>
+                            <div class="photo-slot">FOTO 2<br>814×570</div>
+                            <div class="photo-slot">FOTO 3<br>814×570</div>
+                            <div class="photo-slot">FOTO 4<br>814×570</div>
+                            <div class="photo-slot">FOTO 5<br>814×570</div>
+                            <div class="photo-slot">FOTO 6<br>814×570</div>
+                            <div class="photo-slot">FOTO 7<br>814×570</div>
+                            <div class="photo-slot">FOTO 8<br>814×570</div>
+                            <div class="brand-area brand-area-8">BRANDING</div>
+                        </div>
+                    </div>
+                    <div class="specs">
+                        <table>
+                            <tr><td>Canvas Size</td><td>1748 × 2480 px</td></tr>
+                            <tr><td>Photo Size</td><td>814 × 570 px</td></tr>
+                            <tr><td>Margin</td><td>40 px</td></tr>
+                            <tr><td>Spacing</td><td>40 px</td></tr>
+                            <tr><td>Brand Area</td><td>160 px height</td></tr>
+                        </table>
+                    </div>
+                    <a href="/admin/frame-templates/download/design-template?slots=8" class="download-btn">
+                        📥 Download Template 8 Slot
+                    </a>
+                </div>
+            </div>
+
+            <!-- Color Palette -->
+            <h3 style="color: #1e3a8a; margin: 40px 0 20px;">🎨 Brand Colors Fotoku</h3>
+            <div class="color-palette">
+                <div class="color-item">
+                    <div class="color-swatch" style="background-color: #1e3a8a;"></div>
+                    <strong>Navy Blue</strong><br>
+                    <code>#1e3a8a</code>
+                </div>
+                <div class="color-item">
+                    <div class="color-swatch" style="background-color: #166534;"></div>
+                    <strong>Green</strong><br>
+                    <code>#166534</code>
+                </div>
+                <div class="color-item">
+                    <div class="color-swatch" style="background-color: #dbeafe;"></div>
+                    <strong>Light Blue</strong><br>
+                    <code>#dbeafe</code>
+                </div>
+                <div class="color-item">
+                    <div class="color-swatch" style="background-color: #dcfce7;"></div>
+                    <strong>Light Green</strong><br>
+                    <code>#dcfce7</code>
+                </div>
+                <div class="color-item">
+                    <div class="color-swatch" style="background-color: #ffffff; border-color: #94a3b8;"></div>
+                    <strong>White</strong><br>
+                    <code>#ffffff</code>
+                </div>
+            </div>
+
+            <!-- Tips Section -->
+            <div class="tips">
+                <h4>💡 Tips Desain</h4>
+                <ul>
+                    <li><strong>Format Canvas:</strong> A5 (148×210mm) @ 300 DPI = 1748×2480 pixels</li>
+                    <li><strong>Photo Areas:</strong> Gunakan Smart Objects di Photoshop untuk easy replacement</li>
+                    <li><strong>Typography:</strong> Gunakan font Inter untuk konsistensi brand</li>
+                    <li><strong>Brand Area:</strong> Tempatkan logo Fotoku WAJIB, info customer, dan QR code</li>
+                    <li><strong>File Format:</strong> Save sebagai PSD dengan layer terorganisir</li>
+                    <li><strong>File Size:</strong> Maksimal 10MB untuk template, 5MB untuk preview</li>
+                </ul>
+            </div>
+
+            <div class="tips" style="border-left-color: #dc2626; background: #fef2f2;">
+                <h4 style="color: #dc2626;">⚠️ PENTING - Perubahan Branding</h4>
+                <ul>
+                    <li style="color: #dc2626;"><strong>NO AUTOMATIC WATERMARK:</strong> Sistem tidak akan menambahkan watermark Fotoku lagi</li>
+                    <li style="color: #dc2626;"><strong>MANDATORY BRANDING:</strong> Logo Fotoku WAJIB ada di setiap template desain</li>
+                    <li style="color: #dc2626;"><strong>DESIGNER RESPONSIBILITY:</strong> Desainer bertanggung jawab menambahkan branding</li>
+                    <li style="color: #dc2626;"><strong>FLEXIBLE PLACEMENT:</strong> Logo bisa ditempatkan di mana saja asal terlihat jelas</li>
+                </ul>
+            </div>
+
+            <!-- Workflow -->
+            <div class="tips" style="border-left-color: #166534; background: #f0fdf4;">
+                <h4 style="color: #166534;">🛠️ Workflow Desain</h4>
+                <ul>
+                    <li style="color: #166534;"><strong>Setup:</strong> Buat canvas baru sesuai spesifikasi</li>
+                    <li style="color: #166534;"><strong>Import:</strong> Download dan import SVG template sebagai panduan</li>
+                    <li style="color: #166534;"><strong>Layout:</strong> Buat area foto dengan ukuran yang tepat</li>
+                    <li style="color: #166534;"><strong>Design:</strong> Tambahkan elemen dekoratif dan branding WAJIB</li>
+                    <li style="color: #166534;"><strong>Test:</strong> Coba dengan foto sample untuk memastikan hasil</li>
+                    <li style="color: #166534;"><strong>Export:</strong> Simpan PSD dan buat preview image</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

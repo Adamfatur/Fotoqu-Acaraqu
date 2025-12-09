@@ -1,0 +1,702 @@
+{{-- Camera and Photo Capture JavaScript --}}
+<script>
+    // Environment flag: in development/local we allow flexible resolutions; in production we enforce Full HD
+    const IS_DEV = Boolean(@json(config('app.debug') || app()->environment('local')));
+    console.log('💻 Camera init mode:', IS_DEV ? 'Development (flexible resolution)' : 'Production (Full HD enforced)');
+    // Performance optimizations for camera preview
+    (function() {
+        // Enable hardware acceleration hints for the browser
+        const style = document.createElement('style');
+        style.textContent = `
+            #camera-preview {
+                transform: translate3d(0,0,0) !important;
+                will-change: transform !important;
+                -webkit-transform: translateZ(0) !important;
+                transform: translateZ(0) !important;
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Request idle callback for optimization tasks
+        if (window.requestIdleCallback) {
+            requestIdleCallback(() => {
+                console.log('🚀 Camera performance optimizations loaded');
+            });
+        }
+    })();
+    
+    async function initializeCamera() {
+        try {
+            // Stop existing stream if any
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+
+            // --- FIX: Request generic camera access first to get permissions ---
+            // This call is primarily to trigger the browser's permission prompt.
+            // Once permission is granted, enumerateDevices will return a full list.
+            await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            
+            // Try to get information about supported constraints and browser
+            try {
+                // Detect browser
+                const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+                const isFirefox = typeof InstallTrigger !== 'undefined' || /Firefox/.test(navigator.userAgent);
+                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+                
+                console.log('🌐 Browser detection:', { isChrome, isFirefox, isSafari });
+                
+                const supportedConstraints = navigator.mediaDevices.getSupportedConstraints();
+                console.log('📊 Browser supports these constraints:', supportedConstraints);
+                
+                // Check if specific width/height constraints are supported
+                if (supportedConstraints.width && supportedConstraints.height) {
+                    console.log('✅ Browser supports width/height constraints');
+                } else {
+                    console.error('⚠️ Browser might NOT support width/height constraints!');
+                }
+                
+                // If Firefox, adjust constraints approach
+                if (isFirefox) {
+                    console.log('🦊 Firefox detected - might need to handle constraints differently!');
+                }
+            } catch (e) {
+                console.warn('Could not determine supported constraints:', e);
+            }
+
+            // --- Now, load the full list of camera devices ---
+            await loadCameraDevices();
+
+            // --- Then, start the stream with default or selected camera ---
+            const select = document.getElementById('camera-device-select');
+            const defaultDeviceId = select ? select.value : undefined; // Get the first available camera
+
+            // Determine facing mode - use global currentCameraFacing if set
+            const facingMode = window.currentCameraFacing || 'user';
+            
+            // Select constraints based on environment
+            let cameraConstraints = null;
+            if (IS_DEV) {
+                // Development/local: keep constraints flexible so any resolution can start
+                cameraConstraints = defaultDeviceId ? { deviceId: { exact: defaultDeviceId } } : true;
+            } else {
+                // Production: enforce Full HD
+                cameraConstraints = defaultDeviceId ? {
+                    deviceId: { exact: defaultDeviceId },
+                    width: { min: 1920, ideal: 1920 },
+                    height: { min: 1080, ideal: 1080 },
+                    frameRate: { ideal: 30 }
+                } : {
+                    width: { min: 1920, ideal: 1920 },
+                    height: { min: 1080, ideal: 1080 },
+                    frameRate: { ideal: 30 }
+                };
+            }
+            console.log('📷 Camera base constraints:', cameraConstraints === true ? 'auto (true)' : cameraConstraints);
+            
+            // Attempt to initialize camera with appropriate constraints
+            try {
+                console.log(IS_DEV ? '📷 DEV: starting camera with flexible constraints' : '📷 PROD: enforcing Full HD 1920x1080');
+                
+                // Check for Logitech BRIO specifically
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                const hasLogitechBrio = videoDevices.some(device => 
+                    device.label.toLowerCase().includes('brio') || 
+                    device.label.toLowerCase().includes('logitech')
+                );
+                
+                if (hasLogitechBrio && !IS_DEV) {
+                    console.log('🎥 LOGITECH BRIO DETECTED! Menggunakan konfigurasi khusus Logitech');
+                    // Override constraints for Logitech BRIO - more aggressive
+                    cameraConstraints.width = { min: 1920, ideal: 1920 };
+                    cameraConstraints.height = { min: 1080, ideal: 1080 };
+                }
+                
+                console.log('⚙️ Final constraints:', cameraConstraints === true ? 'auto (true)' : JSON.stringify(cameraConstraints, null, 2));
+                const stream = await navigator.mediaDevices.getUserMedia({ video: cameraConstraints });
+                
+                const videoElement = document.getElementById('camera-preview');
+                videoElement.srcObject = stream;
+                
+                // Optimize video element for smooth playback
+                videoElement.setAttribute('playsinline', 'true');
+                videoElement.setAttribute('autoplay', 'true');
+                videoElement.muted = true;
+            
+            // Performance optimizations for smooth video playback - Enhanced for MacBook
+            videoElement.style.transform = 'translate3d(0,0,0)';
+            videoElement.style.willChange = 'transform';
+            videoElement.style.webkitBackfaceVisibility = 'hidden';
+            videoElement.style.backfaceVisibility = 'hidden';
+            
+            // MacBook-specific optimizations for smooth Full HD preview
+            videoElement.style.imageRendering = 'auto';
+            videoElement.style.webkitOptimizeLegibility = 'true';
+            videoElement.style.webkitFontSmoothing = 'antialiased';
+            
+            // Enable GPU acceleration for better performance
+            videoElement.style.webkitTransform = 'translateZ(0)';
+            videoElement.style.transform = 'translateZ(0)';
+            
+            // Wait for video to start playing for smooth experience
+            await new Promise((resolve) => {
+                videoElement.addEventListener('playing', resolve, { once: true });
+                // Timeout fallback
+                setTimeout(resolve, 2000);
+            });
+            
+            // Get actual video track settings for logging
+            const videoTrack = stream.getVideoTracks()[0];
+            if (videoTrack) {
+                const settings = videoTrack.getSettings();
+                
+                console.log('✅ Camera initialized with settings:', {
+                    device: 'MacBook',
+                    width: settings.width,
+                    height: settings.height,
+                    frameRate: settings.frameRate,
+                    deviceId: settings.deviceId,
+                    aspectRatio: settings.aspectRatio,
+                    cameraLabel: videoTrack.label
+                });
+                
+                console.log(' MacBook Mode - Resolution achieved:', `${settings.width}x${settings.height}@${settings.frameRate}fps`);
+                
+                // Show simple status
+                const statusEl = document.getElementById('status-indicator');
+                if (statusEl) {
+                    if (!IS_DEV && settings.width >= 1920) {
+                        statusEl.innerHTML = '<div class="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-2"></div>✅ Full HD - ' + settings.width + 'x' + settings.height + '@' + settings.frameRate + 'fps';
+                    } else if (settings.width >= 1280) {
+                        const label = IS_DEV ? '✅ HD (Dev)' : '✅ HD';
+                        statusEl.innerHTML = '<div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-2"></div>' + label + ' - ' + settings.width + 'x' + settings.height + '@' + settings.frameRate + 'fps';
+                    } else {
+                        const label = IS_DEV ? '⚠️ Low quality (Dev)' : '❌ LOW QUALITY';
+                        statusEl.innerHTML = '<div class="w-2 h-2 ' + (IS_DEV ? 'bg-yellow-400' : 'bg-red-400') + ' rounded-full animate-pulse mr-2"></div>' + label + ' - ' + settings.width + 'x' + settings.height;
+                        if (!IS_DEV) {
+                            console.error('❌ UNACCEPTABLE resolution:', settings.width + 'x' + settings.height);
+                        }
+                    }
+                }
+            }
+            
+            cameraStream = stream;
+            
+            // Start auto-capture sequence
+            startAutoCapture();
+            
+        } catch (error) {
+            console.error('❌ Gagal menginisialisasi kamera:', error);
+            // Dev: try a very permissive fallback before giving up
+            if (IS_DEV) {
+                try {
+                    console.log('🔄 DEV fallback: trying video: true');
+                    const devStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    const videoElement = document.getElementById('camera-preview');
+                    videoElement.srcObject = devStream;
+                    videoElement.setAttribute('playsinline', 'true');
+                    videoElement.setAttribute('autoplay', 'true');
+                    videoElement.muted = true;
+                    cameraStream = devStream;
+                    return;
+                } catch (devErr) {
+                    console.warn('⚠️ DEV permissive fallback also failed:', devErr);
+                }
+            }
+            throw error;
+        }
+        } catch (error) {
+            debugLog('Camera access error', error);
+            // Provide a more user-friendly error
+            const errorPanel = document.getElementById('camera-error-panel');
+            const errorMessage = document.getElementById('camera-error-message');
+            
+            if (errorPanel && errorMessage) {
+                if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                    errorMessage.textContent = 'Akses kamera ditolak. Mohon izinkan akses kamera di pengaturan browser Anda untuk melanjutkan.';
+                } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                    errorMessage.textContent = 'Kamera tidak ditemukan. Pastikan kamera terhubung dengan benar.';
+                } else {
+                    errorMessage.textContent = `Terjadi error saat mengakses kamera: ${error.message}. Coba refresh halaman atau pilih kamera lain.`;
+                }
+                
+                errorPanel.classList.remove('hidden');
+            }
+            
+            // Hide other states
+            const captureState = document.getElementById('capture-state');
+            const waitingState = document.getElementById('waiting-state');
+            if (captureState) captureState.classList.add('hidden');
+            if (waitingState) waitingState.classList.add('hidden');
+        }
+    }
+
+    async function startAutoCapture() {
+        const totalPhotos = settings.total_photos || 3;
+        const countdownSeconds = 3; // Fixed 3 seconds countdown only
+        const countdownSound = document.getElementById('countdown-sound');
+        
+        for (let i = 1; i <= totalPhotos; i++) {
+            // Update photo counter
+            document.getElementById('photo-count').textContent = i - 1;
+            document.getElementById('current-photo').textContent = i;
+            
+            // Start playing the continuous timer sound
+            countdownSound.currentTime = 0;
+            countdownSound.play();
+
+            // Show countdown for this photo (3 seconds total)
+            await showCountdown(countdownSeconds);
+            
+            // Capture photo (sound will be stopped inside this function)
+            // Non-blocking capture: do not await upload/save, only perform capture and queue upload
+            try {
+                await capturePhoto(i);
+            } catch (e) {
+                // Stop sequence on hard error
+                throw e;
+            }
+            
+            // No interval waiting - go directly to next photo
+        }
+        
+        // Auto move to selection state
+        setTimeout(() => {
+            showSelectionState();
+        }, 1000);
+    }
+
+    async function capturePhoto(sequenceNumber) {
+        if (!cameraStream) return;
+
+        // Stop the timer sound right before capture
+        const countdownSound = document.getElementById('countdown-sound');
+        countdownSound.pause();
+        countdownSound.currentTime = 0;
+
+        // Optimized capture process - use actual video dimensions for best quality
+        const video = document.getElementById('camera-preview');
+        
+        // Use requestAnimationFrame for smoother capture timing
+        await new Promise(resolve => {
+            requestAnimationFrame(() => {
+                const canvas = document.createElement('canvas');
+                
+                // Use actual video dimensions for FULL HD quality capture
+                // Prioritize actual stream resolution, fallback to Full HD
+                const captureWidth = video.videoWidth > 0 ? video.videoWidth : 1920; // Full HD fallback
+                const captureHeight = video.videoHeight > 0 ? video.videoHeight : 1080; // Full HD fallback
+                
+                if (captureWidth < 1920 || captureHeight < 1080) {
+                    console.error('❌ RESOLUSI TIDAK SESUAI!', `${captureWidth}x${captureHeight} bukan 1920x1080`);
+                    console.error('📺 Video stream hanya:', `${video.videoWidth}x${video.videoHeight}`);
+                } else {
+                    console.log('✅ FULL HD PHOTO CAPTURE:', `${captureWidth}x${captureHeight}`);
+                    console.log('📺 Video stream size:', `${video.videoWidth}x${video.videoHeight}`);
+                }
+                
+                canvas.width = captureWidth;
+                canvas.height = captureHeight;
+                
+                const ctx = canvas.getContext('2d', {
+                    alpha: false, // Improve performance for opaque images
+                    willReadFrequently: false, // Optimize for write-only canvas
+                    desynchronized: false // Ensure maximum quality over performance
+                });
+                
+                // MAXIMUM quality image rendering settings
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.globalCompositeOperation = 'source-over'; // Best quality composite
+                
+                // Direct capture at native resolution for MAXIMUM quality
+                ctx.drawImage(video, 0, 0, captureWidth, captureHeight);
+                
+                // Play shutter sound
+                document.getElementById('shutter-sound').play();
+
+                // Show flash effect without blocking
+                showFlash();
+                
+                // Get JPEG blob asynchronously for non-blocking encoding
+                let q = (settings && typeof settings.photo_jpeg_quality !== 'undefined') ? settings.photo_jpeg_quality : 0.99;
+                if (q > 1) q = Math.min(1, Math.max(0.01, q / 100));
+                else q = Math.min(1, Math.max(0.01, q));
+
+                canvas.toBlob((blob) => {
+                    try {
+                        if (!blob) {
+                            throw new Error('Blob encoding failed');
+                        }
+
+                        const objectUrl = URL.createObjectURL(blob);
+                        const localPhoto = {
+                            id: `temp-${Date.now()}-${sequenceNumber}-${Math.random().toString(36).slice(2)}`,
+                            temp: true,
+                            sequence_number: sequenceNumber,
+                            width: captureWidth,
+                            height: captureHeight,
+                            objectUrl,
+                            serverId: null,
+                            serverData: null,
+                        };
+
+                        // Push local preview immediately
+                        capturedPhotos.push(localPhoto);
+
+                        console.log('📸 Photo captured successfully (non-blocking):', {
+                            resolution: `${captureWidth}x${captureHeight}`,
+                            sequence: sequenceNumber,
+                            sizeKB: Math.round(blob.size / 1024)
+                        });
+
+                        // Update local counter UI immediately
+                        const pc = document.getElementById('photo-count');
+                        if (pc) pc.textContent = sequenceNumber;
+
+                        // Begin background upload to server (base64 via FileReader)
+                        uploadCapturedPhoto(localPhoto, blob);
+                    } catch (err) {
+                        console.error('Failed during blob handling:', err);
+                        alert('Gagal memproses foto: ' + err.message);
+                    } finally {
+                        // Clear canvas reference
+                        canvas.width = 0;
+                        canvas.height = 0;
+                    }
+                }, 'image/jpeg', q);
+                
+                resolve();
+            });
+        });
+    }
+
+    // Background uploader: converts blob -> base64 data URL and posts to server without blocking capture loop
+    function uploadCapturedPhoto(localPhoto, blob) {
+        try {
+            const reader = new FileReader();
+            reader.onload = async () => {
+                const dataUrl = reader.result;
+                try {
+                    const response = await axios.post(`/photobox/${photoboxCode}/capture`, {
+                        photo_data: dataUrl,
+                        sequence_number: localPhoto.sequence_number
+                    });
+
+                    if (response.data && response.data.success && response.data.photo) {
+                        // Attach server mapping info to local photo
+                        localPhoto.serverId = response.data.photo.id;
+                        localPhoto.serverData = response.data.photo;
+                        // Optionally expose a global event for selection UI to reconcile
+                        document.dispatchEvent(new CustomEvent('fotoku:photoUploaded', {
+                            detail: { sequence_number: localPhoto.sequence_number, serverId: localPhoto.serverId, serverData: localPhoto.serverData }
+                        }));
+                    }
+                } catch (err) {
+                    console.error('Upload failed for sequence', localPhoto.sequence_number, err);
+                    // Keep local preview available; selection UI will block confirmation until mapped
+                }
+            };
+            reader.onerror = (e) => {
+                console.error('FileReader failed:', e);
+            };
+            reader.readAsDataURL(blob);
+        } catch (e) {
+            console.error('uploadCapturedPhoto error:', e);
+        }
+    }
+
+    async function showCountdown(seconds) {
+        const overlay = document.getElementById('countdown-overlay');
+        const numberEl = document.getElementById('countdown-number');
+        const circle = document.querySelector('#countdown-overlay .countdown-circle');
+        const r = 40; // from SVG
+        const C = 2 * Math.PI * r; // circumference ~ 251.2
+
+        overlay.classList.remove('hidden');
+
+        // Initialize ring to empty and then animate to full smoothly
+        if (circle) {
+            circle.style.transition = 'none';
+            circle.style.strokeDasharray = String(C);
+            circle.style.strokeDashoffset = String(C);
+            // Next frame: apply transition and target 0
+            requestAnimationFrame(() => {
+                circle.style.transition = `stroke-dashoffset ${seconds}s linear`;
+                circle.style.strokeDashoffset = '0';
+            });
+        }
+
+        // Smooth ring while number ticks once per second
+        numberEl.textContent = seconds;
+        await new Promise((resolve) => {
+            let current = seconds;
+            const timer = setInterval(() => {
+                current -= 1;
+                if (current <= 0) {
+                    clearInterval(timer);
+                    resolve();
+                } else {
+                    numberEl.textContent = current;
+                }
+            }, 1000);
+        });
+
+        // Hide and reset ring for next use
+        overlay.classList.add('hidden');
+        if (circle) {
+            // Remove transition so we can snap back to empty state
+            circle.style.transition = 'none';
+            circle.style.strokeDashoffset = String(C);
+        }
+    }
+
+    function showFlash() {
+        const flash = document.getElementById('flash-overlay');
+        
+        // Enhanced futuristic flash effect
+        flash.style.opacity = '1';
+        flash.style.transform = 'scale(1.05)';
+        
+        // Add pulsing effect
+        setTimeout(() => {
+            flash.style.opacity = '0.7';
+            flash.style.transform = 'scale(1)';
+        }, 50);
+        
+        setTimeout(() => {
+            flash.style.opacity = '0';
+            flash.style.transform = 'scale(0.95)';
+        }, 100);
+        
+        // Reset transform after animation
+        setTimeout(() => {
+            flash.style.transform = 'scale(1)';
+        }, 200);
+    }
+
+    // Camera settings functions
+    function toggleCameraSettings() {
+        console.log('📸 toggleCameraSettings called!');
+        const panel = document.getElementById('camera-settings-panel');
+        if (panel) {
+            console.log('📸 Camera settings panel found, toggling visibility');
+            panel.classList.toggle('hidden');
+        } else {
+            console.error('📸 Camera settings panel not found!');
+            alert('Camera settings panel not found. Please refresh the page.');
+        }
+    }
+
+    async function loadCameraDevices() {
+        try {
+            // Ensure permissions are granted before enumerating
+            await navigator.mediaDevices.getUserMedia({ video: true });
+            
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            const select = document.getElementById('camera-device-select');
+            
+            const currentSelection = select.value;
+            select.innerHTML = ''; // Clear existing options
+
+            if (videoDevices.length === 0) {
+                select.innerHTML = '<option value="">Kamera tidak ditemukan</option>';
+                return;
+            }
+            
+            videoDevices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.textContent = device.label || `Kamera ${select.options.length + 1}`;
+                select.appendChild(option);
+            });
+
+            // Restore previous selection if it still exists
+            if (currentSelection && Array.from(select.options).some(opt => opt.value === currentSelection)) {
+                select.value = currentSelection;
+            }
+
+        } catch (error) {
+            console.error('Error loading camera devices:', error);
+            const select = document.getElementById('camera-device-select');
+            if(select) {
+               select.innerHTML = `<option value="">Error: ${error.name}</option>`;
+            }
+        }
+    }
+    
+    function refreshCameraDevices() {
+         loadCameraDevices();
+    }
+
+    function switchCamera() {
+        console.log('📷 Switching camera device...');
+        
+        const select = document.getElementById('camera-device-select');
+        const deviceId = select ? select.value : null;
+
+        if (!deviceId) {
+            console.error('❌ No camera device selected');
+            alert('Pilih kamera terlebih dahulu.');
+            return;
+        }
+
+        // Stop current stream
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+
+        // Constraints depend on environment
+        const cameraConstraints = IS_DEV ?
+        {
+            deviceId: { exact: deviceId }
+        } : {
+            deviceId: { exact: deviceId },
+            width: { min: 1920, ideal: 1920 },
+            height: { min: 1080, ideal: 1080 },
+            frameRate: { ideal: 30 }
+        };
+
+        // Check for Logitech BRIO specifically
+        navigator.mediaDevices.enumerateDevices().then(devices => {
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            const isLogitechBrio = videoDevices.some(device => 
+                device.label.toLowerCase().includes('brio') || 
+                device.label.toLowerCase().includes('logitech')
+            );
+            
+            if (isLogitechBrio && !IS_DEV) {
+                console.log('🎥 LOGITECH BRIO DETECTED in switchCamera! Menggunakan konfigurasi khusus Logitech');
+                // Override constraints for Logitech BRIO - more aggressive
+                cameraConstraints.width = { min: 1920, ideal: 1920 };
+                cameraConstraints.height = { min: 1080, ideal: 1080 };
+            }
+            
+            console.log('⚙️ Switch camera constraints:', JSON.stringify(cameraConstraints, null, 2));
+            
+            navigator.mediaDevices.getUserMedia({ video: cameraConstraints })
+                .then(stream => {
+                    const video = document.getElementById('camera-preview');
+                    if (video) {
+                        video.srcObject = stream;
+                    }
+                    cameraStream = stream;
+                    
+                    // Log actual resolution achieved
+                    const videoTrack = stream.getVideoTracks()[0];
+                    if (videoTrack) {
+                        const settings = videoTrack.getSettings();
+                        console.log('📐 Actual resolution after switch:', `${settings.width}x${settings.height}@${settings.frameRate}fps`);
+                    }
+                    
+                    console.log('✅ Camera switched successfully');
+                    alert('Kamera berhasil diganti!');
+                })
+                .catch(error => {
+                    console.error('❌ Camera switch failed:', error);
+                    
+                    if (error.name === 'OverconstrainedError') {
+                        console.log('⚠️ Fallback ke HD dalam switchCamera');
+                        const fallbackConstraints = {
+                            deviceId: { exact: deviceId },
+                            width: { min: 1280, ideal: 1280 },
+                            height: { min: 720, ideal: 720 },
+                            frameRate: { ideal: 30 }
+                        };
+                        
+                        navigator.mediaDevices.getUserMedia({ video: fallbackConstraints })
+                            .then(fallbackStream => {
+                                const video = document.getElementById('camera-preview');
+                                if (video) {
+                                    video.srcObject = fallbackStream;
+                                }
+                                cameraStream = fallbackStream;
+                                console.log('⚠️ Switched with fallback HD resolution');
+                                alert('Kamera berhasil diganti dengan resolusi HD!');
+                            })
+                            .catch(fallbackError => {
+                                console.error('❌ Even fallback switch failed:', fallbackError);
+                                alert(`Gagal beralih ke kamera. Error: ${error.message}`);
+                            });
+                    } else {
+                        alert(`Gagal beralih ke kamera. Error: ${error.message}`);
+                    }
+                });
+        }).catch(error => {
+            console.error('❌ Could not enumerate devices in switchCamera:', error);
+            alert(`Gagal beralih ke kamera. Error: ${error.message}`);
+        });
+    }
+
+    function testCamera() {
+        const select = document.getElementById('camera-device-select');
+        const deviceId = select.value;
+
+        if (deviceId) {
+             // The camera is already previewing, a simple success message is enough
+             alert('Tes kamera berhasil! Kamera siap digunakan.');
+        } else {
+            alert('Pilih kamera terlebih dahulu.');
+        }
+    }
+
+    function stopCamera() {
+        console.log('🔴 Stopping camera stream');
+        
+        try {
+            // Stop all tracks in the camera stream
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => {
+                    track.stop();
+                    console.log('🔴 Stopped track:', track.kind);
+                });
+                cameraStream = null;
+            }
+            
+            // Clear video source
+            const video = document.getElementById('camera-preview');
+            if (video) {
+                video.srcObject = null;
+            }
+            
+            console.log('✅ Camera stream stopped successfully');
+        } catch (error) {
+            console.error('❌ Error stopping camera:', error);
+        }
+    }
+    
+    // Make stopCamera globally available
+    window.stopCamera = stopCamera;
+
+    function changeCamera() {
+        console.log('📷 changeCamera() called - redirecting to switchCamera()');
+        // Redirect to the improved switchCamera function
+        switchCamera();
+    }
+    
+    // Make camera functions globally available
+    window.stopCamera = stopCamera;
+    window.changeCamera = changeCamera;
+    window.loadCameraDevices = loadCameraDevices;
+    window.toggleCameraSettings = toggleCameraSettings;
+    window.switchCamera = switchCamera;
+    window.testCamera = testCamera;
+    window.refreshCameraDevices = refreshCameraDevices;
+    
+    // Add debug logging for camera functions availability
+    console.log('🔄 Camera functions exported to window:');
+    console.log('toggleCameraSettings type:', typeof window.toggleCameraSettings);
+    console.log('switchCamera type:', typeof window.switchCamera);
+    console.log('testCamera type:', typeof window.testCamera);
+    
+    // Add a global event listener for checking camera function availability after full document load
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('🔄 Document loaded, checking camera functions:');
+        console.log('toggleCameraSettings available:', typeof window.toggleCameraSettings === 'function');
+        console.log('switchCamera available:', typeof window.switchCamera === 'function');
+        console.log('testCamera available:', typeof window.testCamera === 'function');
+    });
+</script>

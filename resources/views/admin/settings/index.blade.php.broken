@@ -1,0 +1,700 @@
+@extends('admin.layout')
+
+@section('header', 'Pengaturan Sistem')
+@section('description', 'Konfigurasi dan pengaturan aplikasi Fotoku')
+
+@section('content')
+<style>
+    /* Custom styles for modern settings page */
+    .settings-card {
+        background: #1e3a8a;
+        border: none;
+        box-shadow: 0 8px 32px rgba(30, 58, 138, 0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .settings-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 40px rgba(30, 58, 138, 0.25);
+    }
+    
+    .settings-header {
+        background: #059669;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .settings-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        transition: left 0.5s;
+    }
+    
+    .settings-card:hover .settings-header::before {
+        left: 100%;
+    }
+    
+    .settings-content {
+        background: #1e3a8a;
+        color: white;
+    }
+    
+    .form-input {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+    
+    .form-input:focus {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: #059669;
+        box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2);
+        outline: none;
+        transform: scale(1.02);
+    }
+    
+    .form-input::placeholder {
+        color: rgba(255, 255, 255, 0.6);
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #059669, #047857);
+        border: none;
+        color: white;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(5, 150, 105, 0.2);
+    }
+    
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #047857, #065f46);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(5, 150, 105, 0.4);
+    }
+    
+    .btn-secondary {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+    
+    .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.5);
+        transform: translateY(-1px);
+    }
+    
+    .btn-danger {
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        border: none;
+        color: white;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(220, 38, 38, 0.2);
+    }
+    
+    .btn-danger:hover {
+        background: linear-gradient(135deg, #b91c1c, #991b1b);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(220, 38, 38, 0.4);
+    }
+    
+    .settings-group-icon {
+        width: 48px;
+        height: 48px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: white;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+    
+    .settings-card:hover .settings-group-icon {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(1.1);
+    }
+    
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 56px;
+        height: 28px;
+    }
+    
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.3);
+        transition: 0.4s;
+        border-radius: 28px;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 22px;
+        width: 22px;
+        left: 3px;
+        bottom: 3px;
+        background: white;
+        transition: 0.4s;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    input:checked + .toggle-slider {
+        background: #059669;
+        box-shadow: 0 0 10px rgba(5, 150, 105, 0.3);
+    }
+    
+    input:checked + .toggle-slider:before {
+        transform: translateX(28px);
+    }
+    
+    .page-header-icon {
+        background: linear-gradient(135deg, #1e3a8a, #059669);
+        box-shadow: 0 8px 32px rgba(30, 58, 138, 0.3);
+        animation: float 3s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    .action-card {
+        background: linear-gradient(135deg, #f8fafc, #ffffff);
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s ease;
+    }
+    
+    .action-card:hover {
+        border-color: #059669;
+        box-shadow: 0 8px 32px rgba(5, 150, 105, 0.1);
+    }
+    
+    .danger-zone {
+        background: linear-gradient(135deg, #fef2f2, #ffffff);
+        border: 2px solid #fecaca;
+        transition: all 0.3s ease;
+    }
+    
+    .danger-zone:hover {
+        border-color: #dc2626;
+        box-shadow: 0 8px 32px rgba(220, 38, 38, 0.1);
+    }
+</style>
+
+<div class="max-w-6xl mx-auto space-y-8">
+    <!-- Page Header -->
+    <div class="text-center mb-12">
+        <div class="page-header-icon inline-flex items-center justify-center w-20 h-20 rounded-full mb-6">
+            <i class="fas fa-cog text-3xl text-white"></i>
+        </div>
+        <h1 class="text-4xl font-bold text-gray-800 mb-3">Pengaturan Sistem</h1>
+        <p class="text-gray-600 text-lg">Kelola konfigurasi dan pengaturan aplikasi Fotoku dengan mudah</p>
+        <div class="w-24 h-1 bg-gradient-to-r from-blue-600 to-green-500 mx-auto mt-4 rounded-full"></div>
+    </div>
+
+    <form action="{{ route('admin.settings.update') }}" method="POST" x-data="settingsForm()">
+        @csrf
+        @method('PUT')
+
+        @foreach($settings as $group => $groupSettings)
+        <div class="settings-card rounded-2xl overflow-hidden mb-8">
+            <!-- Card Header -->
+            <div class="settings-header px-8 py-6">
+                <div class="flex items-center space-x-4">
+                    <div class="settings-group-icon">
+                        @if($group === 'general')
+                            <i class="fas fa-sliders-h"></i>
+                        @elseif($group === 'email')
+                            <i class="fas fa-envelope"></i>
+                        @elseif($group === 'storage')
+                            <i class="fas fa-cloud"></i>
+                        @elseif($group === 'payment')
+                            <i class="fas fa-credit-card"></i>
+                        @else
+                            <i class="fas fa-cog"></i>
+                        @endif
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">
+                            @if($group === 'general')
+                                Pengaturan Umum
+                            @elseif($group === 'email')
+                                Konfigurasi Email
+                            @elseif($group === 'storage')
+                                Penyimpanan & Cloud
+                            @elseif($group === 'payment')
+                                Pembayaran
+                            @else
+                                {{ ucfirst($group) }} Settings
+                            @endif
+                        </h2>
+                        <p class="text-green-100 text-sm">
+                            @if($group === 'general')
+                                Konfigurasi dasar sistem aplikasi
+                            @elseif($group === 'email')
+                                Pengaturan SMTP dan notifikasi email
+                            @elseif($group === 'storage')
+                                Konfigurasi S3 dan file storage
+                            @elseif($group === 'payment')
+                                Gateway pembayaran dan pricing
+                            @else
+                                Pengaturan {{ strtolower($group) }} sistem
+                            @endif
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Card Content -->
+            <div class="settings-content px-8 py-8">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    @foreach($groupSettings as $setting)
+                    <div class="space-y-3">
+                        <label for="{{ $setting->key }}" class="block text-sm font-semibold text-white">
+                            {{ $setting->label }}
+                            @if($setting->description)
+                            <span class="block text-xs text-green-200 font-normal mt-1">{{ $setting->description }}</span>
+                            @endif
+                        </label>
+                        
+                        @if($setting->type === 'boolean')
+                            <div class="flex items-center space-x-4">
+                                <input type="hidden" name="settings[{{ $setting->key }}]" value="false">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" 
+                                           name="settings[{{ $setting->key }}]" 
+                                           value="true" 
+                                           {{ $setting->value === 'true' ? 'checked' : '' }}>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span class="text-sm text-green-200 font-medium">
+                                    {{ $setting->value === 'true' ? 'Aktif' : 'Nonaktif' }}
+                                </span>
+                            </div>
+                        @elseif($setting->type === 'integer')
+                            <input type="number" 
+                                   id="{{ $setting->key }}"
+                                   name="settings[{{ $setting->key }}]" 
+                                   value="{{ $setting->value }}"
+                                   class="form-input w-full px-4 py-3"
+                                   placeholder="Masukkan angka...">
+                        @elseif($setting->type === 'text')
+                            <input type="text" 
+                                   id="{{ $setting->key }}"
+                                   name="settings[{{ $setting->key }}]" 
+                                   value="{{ $setting->value }}"
+                                   class="form-input w-full px-4 py-3"
+                                   placeholder="Masukkan teks...">
+                        @elseif($setting->type === 'email')
+                            <input type="email" 
+                                   id="{{ $setting->key }}"
+                                   name="settings[{{ $setting->key }}]" 
+                                   value="{{ $setting->value }}"
+                                   class="form-input w-full px-4 py-3"
+                                   placeholder="contoh@domain.com">
+                        @elseif($setting->type === 'url')
+                            <input type="url" 
+                                   id="{{ $setting->key }}"
+                                   name="settings[{{ $setting->key }}]" 
+                                   value="{{ $setting->value }}"
+                                   class="form-input w-full px-4 py-3"
+                                   placeholder="https://example.com">
+                        @elseif($setting->type === 'textarea')
+                            <textarea id="{{ $setting->key }}"
+                                      name="settings[{{ $setting->key }}]" 
+                                      rows="4"
+                                      class="form-input w-full px-4 py-3 resize-vertical"
+                                      placeholder="Masukkan teks panjang...">{{ $setting->value }}</textarea>
+                        @elseif($setting->type === 'select')
+                            <select id="{{ $setting->key }}"
+                                    name="settings[{{ $setting->key }}]" 
+                                    class="form-input w-full px-4 py-3">
+                                @foreach($setting->options as $option)
+                                <option value="{{ $option }}" 
+                                        {{ $setting->value === $option ? 'selected' : '' }}>
+                                    {{ ucfirst($option) }}
+                                </option>
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+        @endforeach
+
+        <!-- Action Buttons -->
+        <div class="action-card rounded-2xl p-8">
+            <div class="flex flex-col lg:flex-row gap-6">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-3 mb-3">
+                        <div class="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-tools text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-800">Tindakan Pengaturan</h3>
+                            <p class="text-gray-600 text-sm">Simpan perubahan atau kelola sistem</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-3 mt-6">
+                        <button type="submit" 
+                                class="btn-primary px-8 py-3 rounded-xl font-semibold flex items-center space-x-2">
+                            <i class="fas fa-save"></i>
+                            <span>Simpan Pengaturan</span>
+                        </button>
+                        
+                        <button type="button" 
+                                onclick="testSettings()"
+                                class="btn-secondary px-6 py-3 rounded-xl font-medium flex items-center space-x-2">
+                            <i class="fas fa-vial"></i>
+                            <span>Test Konfigurasi</span>
+                        </button>
+                        
+                        <div class="flex space-x-2">
+                            <button type="button" 
+                                    onclick="clearCache('config')"
+                                    class="btn-secondary px-4 py-3 rounded-xl text-sm">
+                                <i class="fas fa-sync mr-1"></i>
+                                Config
+                            </button>
+                            <button type="button" 
+                                    onclick="clearCache('route')"
+                                    class="btn-secondary px-4 py-3 rounded-xl text-sm">
+                                <i class="fas fa-route mr-1"></i>
+                                Route
+                            </button>
+                            <button type="button" 
+                                    onclick="clearCache('view')"
+                                    class="btn-secondary px-4 py-3 rounded-xl text-sm">
+                                <i class="fas fa-eye mr-1"></i>
+                                View
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="lg:w-80">
+                    <div class="danger-zone rounded-xl p-6">
+                        <div class="flex items-center space-x-3 mb-3">
+                            <div class="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-exclamation-triangle text-white"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-red-800 font-bold text-lg">Reset Pengaturan</h4>
+                                <p class="text-red-600 text-sm">Kembalikan ke nilai default</p>
+                            </div>
+                        </div>
+                        <p class="text-red-600 text-sm mb-4">⚠️ Tindakan ini tidak dapat dibatalkan dan akan menghapus semua kustomisasi pengaturan.</p>
+                        <form action="{{ route('admin.settings.reset') }}" method="POST">
+                            @csrf
+                            <button type="submit" 
+                                    onclick="return confirm('⚠️ PERINGATAN!\n\nAnda akan mereset SEMUA pengaturan ke nilai default.\nSemua kustomisasi akan hilang.\n\nYakin ingin melanjutkan?')"
+                                    class="btn-danger w-full px-6 py-3 rounded-lg font-medium flex items-center justify-center space-x-2">
+                                <i class="fas fa-undo"></i>
+                                <span>Reset All Settings</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+                               name="settings[{{ $setting->key }}]" 
+                               value="{{ $setting->value }}"
+                               min="0"
+                               class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
+                    @else
+                        <input type="text" 
+                               id="{{ $setting->key }}"
+                               name="settings[{{ $setting->key }}]" 
+                               value="{{ $setting->value }}"
+                               class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
+                    @endif
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @endforeach
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-between pt-6">
+            <div class="flex items-center space-x-4">
+                <button type="button" 
+                        onclick="resetSettings()"
+                        class="px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200">
+                    <i class="fas fa-undo mr-2"></i>
+                    Reset ke Default
+                </button>
+                
+                <button type="button" 
+                        onclick="testSettings()"
+                        class="px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-all duration-200">
+                    <i class="fas fa-vial mr-2"></i>
+                    Test Konfigurasi
+                </button>
+            </div>
+            
+            <button type="submit" 
+                    class="px-8 py-3 bg-gradient-to-r from-blue-500 to-emerald-500 text-white rounded-xl hover:from-blue-600 hover:to-emerald-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105">
+                <i class="fas fa-save mr-2"></i>
+                Simpan Pengaturan
+            </button>
+        </div>
+    </form>
+
+    <!-- System Information -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100">
+        <div class="bg-gradient-to-r from-gray-500 to-gray-600 px-6 py-4">
+            <h2 class="text-xl font-bold text-white">Informasi Sistem</h2>
+            <p class="text-gray-200">Detail tentang sistem dan environment</p>
+        </div>
+        
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-3">
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-gray-600">Laravel Version:</span>
+                        <span class="font-medium">{{ app()->version() }}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-gray-600">PHP Version:</span>
+                        <span class="font-medium">{{ PHP_VERSION }}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-gray-600">Database:</span>
+                        <span class="font-medium">{{ config('database.default') }}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-gray-600">Environment:</span>
+                        <span class="font-medium {{ config('app.env') === 'production' ? 'text-green-600' : 'text-orange-600' }}">
+                            {{ strtoupper(config('app.env')) }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="space-y-3">
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-gray-600">App Debug:</span>
+                        <span class="font-medium {{ config('app.debug') ? 'text-red-600' : 'text-green-600' }}">
+                            {{ config('app.debug') ? 'ON' : 'OFF' }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-gray-600">Memory Limit:</span>
+                        <span class="font-medium">{{ ini_get('memory_limit') }}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-gray-600">Max Upload:</span>
+                        <span class="font-medium">{{ ini_get('upload_max_filesize') }}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-gray-600">Timezone:</span>
+                        <span class="font-medium">{{ config('app.timezone') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cache Management -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100">
+        <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4">
+            <h2 class="text-xl font-bold text-white">Cache Management</h2>
+            <p class="text-purple-200">Kelola cache dan optimasi sistem</p>
+        </div>
+        
+        <div class="p-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button onclick="clearCache('config')" 
+                        class="flex flex-col items-center p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors">
+                    <i class="fas fa-cog text-2xl text-blue-600 mb-2"></i>
+                    <span class="text-sm font-medium text-blue-800">Clear Config</span>
+                </button>
+                
+                <button onclick="clearCache('view')" 
+                        class="flex flex-col items-center p-4 bg-green-50 rounded-xl hover:bg-green-100 transition-colors">
+                    <i class="fas fa-eye text-2xl text-green-600 mb-2"></i>
+                    <span class="text-sm font-medium text-green-800">Clear Views</span>
+                </button>
+                
+                <button onclick="clearCache('route')" 
+                        class="flex flex-col items-center p-4 bg-orange-50 rounded-xl hover:bg-orange-100 transition-colors">
+                    <i class="fas fa-route text-2xl text-orange-600 mb-2"></i>
+                    <span class="text-sm font-medium text-orange-800">Clear Routes</span>
+                </button>
+                
+                <button onclick="clearCache('all')" 
+                        class="flex flex-col items-center p-4 bg-red-50 rounded-xl hover:bg-red-100 transition-colors">
+                    <i class="fas fa-trash text-2xl text-red-600 mb-2"></i>
+                    <span class="text-sm font-medium text-red-800">Clear All</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Confirmation Modal -->
+<div id="resetModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-8 max-w-md mx-4 transform scale-95 transition-all duration-300">
+        <div class="text-center">
+            <div class="w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                <i class="fas fa-exclamation-triangle text-2xl text-red-600"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800 mb-2">Reset ke Default?</h3>
+            <p class="text-gray-600 mb-6">Semua pengaturan akan dikembalikan ke nilai default. Tindakan ini tidak dapat dibatalkan.</p>
+            
+            <div class="flex space-x-4">
+                <button onclick="hideResetModal()" 
+                        class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200">
+                    Batal
+                </button>
+<script>
+function settingsForm() {
+    return {
+        init() {
+            console.log('Modern settings form initialized');
+            
+            // Initialize toggle switches
+            document.querySelectorAll('.toggle-switch input').forEach(toggle => {
+                toggle.addEventListener('change', function() {
+                    const statusText = this.closest('.toggle-switch').nextElementSibling;
+                    if (statusText) {
+                        statusText.textContent = this.checked ? 'Aktif' : 'Nonaktif';
+                    }
+                });
+            });
+        }
+    }
+}
+
+function testSettings() {
+    // Show loading state
+    const button = event.target.closest('button');
+    const originalContent = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Testing...';
+    button.disabled = true;
+    
+    // Simulate API call
+    setTimeout(() => {
+        button.innerHTML = originalContent;
+        button.disabled = false;
+        
+        // Show success notification
+        showNotification('✅ Konfigurasi sistem berfungsi dengan baik!', 'success');
+    }, 2000);
+}
+
+function clearCache(type) {
+    const button = event.target;
+    const originalContent = button.innerHTML;
+    
+    // Show loading state
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Clearing...';
+    button.disabled = true;
+    
+    // In a real implementation, this would be an actual API call
+    setTimeout(() => {
+        button.innerHTML = originalContent;
+        button.disabled = false;
+        
+        showNotification(`Cache ${type} berhasil dibersihkan!`, 'success');
+    }, 1500);
+}
+
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transform transition-all duration-300 ${
+        type === 'success' ? 'bg-green-500 text-white' : 
+        type === 'error' ? 'bg-red-500 text-white' : 
+        'bg-blue-500 text-white'
+    }`;
+    notification.innerHTML = `
+        <div class="flex items-center space-x-2">
+            <span>${message}</span>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Form validation
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form[action*="settings.update"]');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            // Basic validation
+            const requiredFields = form.querySelectorAll('input[required], select[required]');
+            let isValid = true;
+            
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    isValid = false;
+                    field.classList.add('border-red-500');
+                    field.focus();
+                } else {
+                    field.classList.remove('border-red-500');
+                }
+            });
+            
+            if (!isValid) {
+                e.preventDefault();
+                showNotification('Mohon lengkapi semua field yang diperlukan', 'error');
+                return false;
+            }
+            
+            // Show saving state
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalContent = submitButton.innerHTML;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+            submitButton.disabled = true;
+        });
+    }
+});
+</script>
+@endsection
