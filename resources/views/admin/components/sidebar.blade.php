@@ -56,28 +56,32 @@
         <a href="{{ route('admin.photoboxes.index') }}"
             class="flex items-center px-4 py-3 text-white rounded-xl transition-all duration-200 hover:bg-white/20 whitespace-nowrap {{ request()->routeIs('admin.photoboxes.*') ? 'bg-white/30 shadow-lg' : '' }}"
             :class="sidebarOpen ? 'justify-start' : 'justify-center'">
-            <i class="fas fa-cube w-5 text-center transition-all duration-300" :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
+            <i class="fas fa-cube w-5 text-center transition-all duration-300"
+                :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
             <span class="font-medium transition-opacity duration-300" x-show="sidebarOpen">Photoboxes</span>
         </a>
 
         <a href="{{ route('admin.packages.index') }}"
             class="flex items-center px-4 py-3 text-white rounded-xl transition-all duration-200 hover:bg-white/20 whitespace-nowrap {{ request()->routeIs('admin.packages.*') ? 'bg-white/30 shadow-lg' : '' }}"
             :class="sidebarOpen ? 'justify-start' : 'justify-center'">
-            <i class="fas fa-box-open w-5 text-center transition-all duration-300" :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
+            <i class="fas fa-box-open w-5 text-center transition-all duration-300"
+                :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
             <span class="font-medium transition-opacity duration-300" x-show="sidebarOpen">Paket & Harga</span>
         </a>
 
         <a href="{{ route('admin.frame-templates.index') }}"
             class="flex items-center px-4 py-3 text-white rounded-xl transition-all duration-200 hover:bg-white/20 whitespace-nowrap {{ request()->routeIs('admin.frame-templates.*') ? 'bg-white/30 shadow-lg' : '' }}"
             :class="sidebarOpen ? 'justify-start' : 'justify-center'">
-            <i class="fas fa-palette w-5 text-center transition-all duration-300" :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
+            <i class="fas fa-palette w-5 text-center transition-all duration-300"
+                :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
             <span class="font-medium transition-opacity duration-300" x-show="sidebarOpen">Template Frame</span>
         </a>
 
         <a href="{{ route('admin.reports.index') }}"
             class="flex items-center px-4 py-3 text-white rounded-xl transition-all duration-200 hover:bg-white/20 whitespace-nowrap {{ request()->routeIs('admin.reports.*') ? 'bg-white/30 shadow-lg' : '' }}"
             :class="sidebarOpen ? 'justify-start' : 'justify-center'">
-            <i class="fas fa-chart-bar w-5 text-center transition-all duration-300" :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
+            <i class="fas fa-chart-bar w-5 text-center transition-all duration-300"
+                :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
             <span class="font-medium transition-opacity duration-300" x-show="sidebarOpen">Laporan</span>
         </a>
 
@@ -87,7 +91,8 @@
             <a href="{{ route('admin.users.index') }}"
                 class="flex items-center px-4 py-3 text-white rounded-xl transition-all duration-200 hover:bg-white/20 whitespace-nowrap {{ request()->routeIs('admin.users.*') ? 'bg-white/30 shadow-lg' : '' }}"
                 :class="sidebarOpen ? 'justify-start' : 'justify-center'">
-                <i class="fas fa-users w-5 text-center transition-all duration-300" :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
+                <i class="fas fa-users w-5 text-center transition-all duration-300"
+                    :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
                 <span class="font-medium transition-opacity duration-300" x-show="sidebarOpen">Kelola Pengguna</span>
             </a>
         @endif
@@ -96,24 +101,35 @@
             <a href="{{ route('admin.customers.index') }}"
                 class="flex items-center px-4 py-3 text-white rounded-xl transition-all duration-200 hover:bg-white/20 whitespace-nowrap {{ request()->routeIs('admin.customers.*') ? 'bg-white/30 shadow-lg' : '' }}"
                 :class="sidebarOpen ? 'justify-start' : 'justify-center'">
-                <i class="fas fa-address-book w-5 text-center transition-all duration-300" :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
+                <i class="fas fa-address-book w-5 text-center transition-all duration-300"
+                    :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
                 <span class="font-medium transition-opacity duration-300" x-show="sidebarOpen">Data Customer</span>
             </a>
         @endif
 
         <div class="border-t border-white/20 my-4"></div>
 
+        <a href="{{ route('admin.download') }}"
+            class="flex items-center px-4 py-3 text-white rounded-xl transition-all duration-200 hover:bg-white/20 whitespace-nowrap {{ request()->routeIs('admin.download') ? 'bg-white/30 shadow-lg' : '' }}"
+            :class="sidebarOpen ? 'justify-start' : 'justify-center'">
+            <i class="fas fa-download w-5 text-center transition-all duration-300"
+                :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
+            <span class="font-medium transition-opacity duration-300" x-show="sidebarOpen">Download App</span>
+        </a>
+
         <a href="{{ route('admin.settings.index') }}"
             class="flex items-center px-4 py-3 text-white rounded-xl transition-all duration-200 hover:bg-white/20 whitespace-nowrap {{ request()->routeIs('admin.settings.*') ? 'bg-white/30 shadow-lg' : '' }}"
             :class="sidebarOpen ? 'justify-start' : 'justify-center'">
-            <i class="fas fa-cog w-5 text-center transition-all duration-300" :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
+            <i class="fas fa-cog w-5 text-center transition-all duration-300"
+                :class="sidebarOpen ? 'mr-3' : 'text-lg'"></i>
             <span class="font-medium transition-opacity duration-300" x-show="sidebarOpen">Pengaturan Sistem</span>
         </a>
     </nav>
 
     <!-- User Menu -->
     <div class="p-4 border-t border-white/20 shrink-0 overflow-hidden whitespace-nowrap">
-        <div class="flex items-center mb-3 transition-all duration-300" :class="sidebarOpen ? 'space-x-3' : 'justify-center'">
+        <div class="flex items-center mb-3 transition-all duration-300"
+            :class="sidebarOpen ? 'space-x-3' : 'justify-center'">
             <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg shrink-0">
                 <i class="fas fa-user text-navy"></i>
             </div>
@@ -127,7 +143,8 @@
             <button type="submit"
                 class="w-full flex items-center px-3 py-2 text-white rounded-lg transition-all duration-200 hover:bg-white/20 whitespace-nowrap"
                 :class="sidebarOpen ? 'justify-start' : 'justify-center'">
-                <i class="fas fa-sign-out-alt w-4 text-center transition-all duration-300" :class="sidebarOpen ? 'mr-2' : ''"></i>
+                <i class="fas fa-sign-out-alt w-4 text-center transition-all duration-300"
+                    :class="sidebarOpen ? 'mr-2' : ''"></i>
                 <span class="text-sm" x-show="sidebarOpen">Logout</span>
             </button>
         </form>

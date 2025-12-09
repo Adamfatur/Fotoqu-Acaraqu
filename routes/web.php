@@ -139,6 +139,11 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::put('settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('settings/reset', [SettingController::class, 'reset'])->name('settings.reset');
 
+    // Download App
+    Route::get('/app-download', function () {
+        return view('admin.download.index');
+    })->name('download');
+
     // User Management (Admin only)
     Route::middleware('role:admin')->group(function () {
         Route::resource('users', UserController::class)->names([
