@@ -1356,6 +1356,15 @@ class PhotoboxController extends Controller
     public function userGallery(PhotoSession $session)
     {
         try {
+            // Check for expiration (30 days from creation)
+            // storage fotonya akan berakhir... akses kesini ditutup
+            if ($session->created_at->lt(now()->subDays(30))) {
+                return response()->view('errors.gallery-error', [
+                    'session' => $session,
+                    'error_message' => 'Masa berlaku penyimpanan foto (30 hari) telah berakhir. Akses galeri ini telah ditutup.'
+                ], 410);
+            }
+
             // Public access - no authentication check needed
             // Make gallery accessible regardless of status for more reliability
             // Only check if session exists (model binding already ensures this)
