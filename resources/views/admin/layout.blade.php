@@ -21,6 +21,7 @@
 
     <!-- Favicon & Theme Color -->
     <link rel="icon" type="image/png" href="{{ asset('logo-fotoku-favicon.png') }}">
+    <link rel="shortcut icon" href="{{ asset('logo-fotoku-favicon.png') }}">
     <meta name="theme-color" content="#1a90d6">
 
     <!-- Charts -->

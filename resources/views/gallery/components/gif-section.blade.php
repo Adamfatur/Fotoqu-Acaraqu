@@ -23,30 +23,30 @@
             @if(isset($gif) && $gif)
                 {{-- GIF Display --}}
                 <div class="flex flex-col items-center gap-5">
-                    <div class="relative group frame-container">
+                    <div class="relative group frame-container w-full max-w-lg mx-auto">
                         <div class="relative bg-white p-3 rounded-2xl shadow-xl">
-                            <img 
-                                src="{{ route('photobox.gallery.serve-gif', ['session' => $photoSession->session_code, 'gif' => $gif->id]) }}" 
+                            <img src="{{ route('photobox.gallery.serve-gif', ['session' => $photoSession->session_code, 'gif' => $gif->id]) }}"
                                 alt="Animated GIF - {{ $photoSession->session_code ?? 'FOTOKU' }}"
-                                class="w-full h-auto rounded-xl"
-                                loading="eager"
-                            >
+                                class="w-full h-auto rounded-xl" loading="eager">
                         </div>
                     </div>
 
                     {{-- Actions --}}
-                    <div class="flex gap-3 flex-wrap justify-center">
-                        <a class="btn btn-primary" href="{{ route('photobox.gallery.serve-gif', ['session' => $photoSession->session_code, 'gif' => $gif->id, 'download' => 1]) }}">
+                    <div class="flex gap-3 flex-col sm:flex-row justify-center w-full sm:w-auto">
+                        <a class="btn btn-primary w-full sm:w-auto justify-center"
+                            href="{{ route('photobox.gallery.serve-gif', ['session' => $photoSession->session_code, 'gif' => $gif->id, 'download' => 1]) }}">
                             <i class="fa-solid fa-download"></i>
                             Unduh GIF
                         </a>
-                        <a class="btn btn-secondary" target="_blank" href="{{ route('photobox.gallery.serve-gif', ['session' => $photoSession->session_code, 'gif' => $gif->id]) }}">
+                        <a class="btn btn-secondary w-full sm:w-auto justify-center" target="_blank"
+                            href="{{ route('photobox.gallery.serve-gif', ['session' => $photoSession->session_code, 'gif' => $gif->id]) }}">
                             <i class="fa-solid fa-up-right-from-square"></i>
                             Buka di Tab Baru
                         </a>
                     </div>
 
-                    <p class="text-sm text-gray-500 text-center">GIF ini adalah bonus dari 3 foto sesi Anda. Nikmati dan bagikan! ✨</p>
+                    <p class="text-sm text-gray-500 text-center">GIF ini adalah bonus dari 3 foto sesi Anda. Nikmati dan
+                        bagikan! ✨</p>
                 </div>
             @else
                 {{-- Processing State --}}
@@ -60,5 +60,5 @@
             @endif
         </div>
     </div>
-    
+
 </section>

@@ -6,6 +6,8 @@
 
         <title>Fotoku - Photobox Otomatis untuk Memori Tak Terlupakan</title>
         <meta name="description" content="Fotoku adalah photobox otomatis profesional untuk studio, acara, dan venue komersial. Ciptakan memori indah dengan kualitas terbaik dalam hitungan detik.">
+        <link rel="icon" type="image/png" href="{{ asset('logo-fotoku-favicon.png') }}">
+        <link rel="shortcut icon" href="{{ asset('logo-fotoku-favicon.png') }}">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
